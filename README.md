@@ -5,8 +5,9 @@ quick start:
 
 - plug a stereo signal or two mono signals into the inputs on norns.
 - head over to the params page.
-- nb: when the buffer is completely cleared (at startup and after KEY 3 + KEY 1 are held), cranes will record incoming audio at 1x speed and will immediately play back at the rates specified in the params page.
-for the most immediate fun, I suggest setting speed voice 1 to 0.5 and speed voice 2 to -1.
+- nb: when the buffer is completely cleared (at startup and after KEY 3 + KEY 1 are held), cranes will record incoming audio at 1x speed into both buffers and will immediately play back at the rates specified in the params page.
+- nb: left input will write to voice 1, right input will write to voice 2.
+- for the most immediate fun, I suggest setting speed voice 1 to 0.5 and speed voice 2 to -1.
 - head back to the performance interface.
 - tap KEY 2 to record into the buffers. also, make some sounds!
 - to loop, tap KEY 2 again. this sets the loop points (s1/e1 and s2/e2) to the length of the recording. you should hear your material played at half-speed on the left and reversed on the right. you should see the one / two counters counting in the same direction and at the same speed as your audio.
