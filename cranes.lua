@@ -37,8 +37,6 @@ rec = 0
 
 function init()
   softcut.buffer_clear()
-  softcut.buffer_clear_channel(1)
-  softcut.buffer_clear_region(0,60)
   audio.level_cut(1)
   audio.level_adc_cut(1)
   audio.level_eng_cut(0)
@@ -203,12 +201,9 @@ function clear_all()
   softcut.rec_level(2,1)
   softcut.play(1,0)
   softcut.play(2,0)
-  --params:set("speed_voice_1", 7)
-  --params:set("speed_voice_2", 7)
   softcut.rate(1, 1)
   softcut.rate(2, 1)
   softcut.buffer_clear()
-  softcut.buffer_clear_region(0,60)
   ray = speedlist[params:get("speed_voice_1")]
   softcut.loop_start(1,0)
   softcut.loop_end(1,60)
@@ -268,6 +263,8 @@ function key(n,z)
           softcut.play(2,1)
           softcut.rec(1,1)
           softcut.rec(2,1)
+          softcut.level(1,0)
+          softcut.level(2,0)
           crane_redraw = 1
           redraw()
           counter:start()
@@ -281,7 +278,6 @@ function key(n,z)
           softcut.rec_level(2,0)
           counter:stop()
           softcut.poll_start_phase()
-          --print("loop length: "..rec_time)
           end_point_1 = rec_time
           softcut.loop_end(1,end_point_1)
           -- voice 2's end point needs to adapt to the buffer size to avoid BOOM
@@ -298,6 +294,8 @@ function key(n,z)
           crane_redraw = 0
           redraw()
           rec_time = 0
+          softcut.level(1,1)
+          softcut.level(2,1)
           softcut.rate(1,speedlist[params:get("speed_voice_1")])
           softcut.rate(2,speedlist_2[params:get("speed_voice_2")])
         end
@@ -417,7 +415,6 @@ function enc(n,d)
   -- 1 is full overwrite
   elseif n == 1 then
     over = util.clamp((over + d/100), 0.0,1.0)
-    --print("overdub: "..over)
     if KEY1_press % 2 == 0 and rec % 2 == 1 then
       softcut.pre_level(1,math.abs(over-1))
     elseif KEY1_press % 2 == 1 and rec % 2 == 1 then
