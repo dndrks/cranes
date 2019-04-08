@@ -1,6 +1,6 @@
 -- cranes
 -- dual looper / delay
--- v2.0 @dan_derks
+-- v2.0.1 @dan_derks
 -- https://llllllll.co/t/21207
 -- ---------------------
 -- to start:
@@ -498,7 +498,13 @@ function crane2()
   screen.level(3)
   screen.aa(1)
   screen.line_width(0.5)
-  screen.move(100-(poll_position_1 * 10),60-(poll_position_2 * 10))
+  if poll_position_1 < 10 then
+    screen.move(100-(poll_position_1 * 3),60-(poll_position_2))
+  elseif poll_position_1 < 40 then
+    screen.move(100-(poll_position_1 * 2),60-(poll_position_2))
+  else
+    screen.move(100-(poll_position_1),60-(poll_position_2))
+  end
   if c2 > 30 then
     screen.text(" ^ ^ ")
   elseif c2 < 30 then
