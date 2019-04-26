@@ -19,3 +19,18 @@ quick start:
 - fun thing to try: adjust start and end points past the existing audio and write into a new section of the selected buffer, then slowly re-introduce the prior section.
 - tap KEY 3 to perform a speed bump on voice 1. hold KEY 3 to produce a more dramatic change. KEY 3’s influence is selectable in the params, under KEY3. ~~ is a small pitch deviation, 0.5 is half-speed, etc.
 - hold KEY3 + KEY 1 to completely erase all buffers. if you hit KEY 2 again after this, you’ll get back to the paper crane.
+
+**grid stuff:**
+
+- plug in a grid and re-boot cranes
+- use the following legend:
+![cranes: grid interface legend](https://llllllll.co/uploads/default/original/3X/e/b/eb0fb77835e0a1fafc7afcaa85569408a03fcebf.jpeg)
+- *speed + direction*: -4x to 4x, 0 in the middle (unlit) functions as ‘pause’
+- *sync playhead to other*: sync the voice’s playhead to the location of the other’s
+- *re-size loop to other*: dynamically adjusts the voice’s current loop points to the other’s
+- *reset playhead to start*: trigger voice to playback from currently defined start point
+- *create snapshot*: collect speed + direction, playhead position, start and end points and assign it to a button on the far left (similar to less concepts)
+- *erase all*: erase all of the voice’s snapshots (similar to less concepts)
+- *snapshot recall*: recall a saved snapshot’s parameters
+- *start point adjustment* + *end point adjustment*: add or subtract time from the voice’s start and end points, in 0.01 second or 0.1 second increments
+- *window adjustment*: adjust voice’s loop window by 0.01 second increments or by the distance between the start and end points
