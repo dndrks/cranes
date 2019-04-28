@@ -1,7 +1,7 @@
 -- cranes
 -- dual looper / delay
 -- (grid optional)
--- v2.1 @dan_derks
+-- v2.11 @dan_derks
 -- https://llllllll.co/t/21207
 -- ---------------------
 -- to start:
@@ -35,6 +35,7 @@ end
 
 -- track recording state
 rec = 0
+local offset=1
 
 local cs = require 'controlspec'
 
@@ -57,11 +58,11 @@ for i=1,TRACKS do
 --  track[i].rec_level = 1
 --  track[i].pre_level = 0
 --  track[i].loop = 0
-  track[i].start_point = 0 -- this one is set!
-  track[i].end_point = 60 -- this one is set!
+  track[i].start_point = 0
+  track[i].end_point = 60
 --  track[i].clip = i
-  track[i].poll_position = 0 -- this one is set
-  track[i].pos_grid = -1 --this one is set!
+  track[i].poll_position = 0
+  track[i].pos_grid = -1
 --  track[i].speed = 0
 --  track[i].rev = 0
 end
@@ -93,7 +94,7 @@ function init()
   for i = 1, 2 do
     softcut.level(i,1.0)
     softcut.play(i, 1)
-    softcut.rate(i, 1)
+    softcut.rate(i, 1*offset)
     softcut.loop_start(i, 0)
     softcut.loop_end(i, 60)
     softcut.loop(i, 1)
@@ -112,7 +113,7 @@ function init()
   params:set("speed_voice_1", 9)
   params:set_action("speed_voice_1",
     function(x)
-      softcut.rate(1, speedlist_1[params:get("speed_voice_1")])
+      softcut.rate(1, speedlist_1[params:get("speed_voice_1")]*offset)
       params:set("speed1_midi", params:get("speed_voice_1"))
       grid_redraw()
     end
@@ -121,7 +122,7 @@ function init()
   params:set("speed_voice_2", 9)
   params:set_action("speed_voice_2",
     function(x)
-      softcut.rate(2, speedlist_2[params:get("speed_voice_2")])
+      softcut.rate(2, speedlist_2[params:get("speed_voice_2")]*offset)
       params:set("speed2_midi", params:get("speed_voice_2"))
       grid_redraw()
     end
@@ -134,6 +135,16 @@ function init()
   params:add_control("speed2_midi","midi ctrl speed v 2", controlspec.new(1,12,'exp',1,12,''))
   params:set_action("speed2_midi", function(x) params:set("speed_voice_2", x) end)
   params:set("speed2_midi", 9)
+  params:add_separator()
+  --
+  params:add_control("offset", "offset", controlspec.new(-24, 24, 'lin', 1, 0, "st"))
+  params:set_action("offset",
+    function(value)
+      offset = math.pow(0.5, -value / 12)
+      softcut.rate(1,speedlist_1[params:get("speed_voice_1")]*offset)
+      softcut.rate(2,speedlist_2[params:get("speed_voice_2")]*offset)
+    end
+  )
   params:add_separator()
   --
   params:add_control("vol_1","vol voice 1",controlspec.new(0,5,'lin',0,5,''))
@@ -152,7 +163,7 @@ function init()
   params:set("pan_2", 0.3)
   params:add_separator()
   --
-  params:add_number("KEY3","KEY3 ( ~~, 0.5, -1, 1.5, 2 )",0,4,0)
+  params:add_control("KEY3","KEY3 ( ~~, 0.5, -1, 1.5, 2 )", controlspec.new(0,4,'lin',1,0,''))
   params:set_action("KEY3", function(x) KEY3 = x end)
   
   counter = metro.init(count, 0.01, -1)
@@ -292,7 +303,7 @@ function restore_speed()
   else
     softcut.rate_slew_time(1,0.6)
   end
-  softcut.rate(1,speedlist_1[params:get("speed_voice_1")])
+  softcut.rate(1,speedlist_1[params:get("speed_voice_1")]*offset)
 end
 
 function clear_all()
@@ -301,7 +312,7 @@ function clear_all()
     softcut.rec_level(i, 1)
     softcut.level(i, 0)
     softcut.play(i, 0)
-    softcut.rate(i, 1)
+    softcut.rate(i, 1*offset)
     softcut.loop_start(i, 0)
     softcut.loop_end(i, 60)
     softcut.position(i, 0)
@@ -327,6 +338,7 @@ function clear_all()
   g:refresh()
   redraw()
   KEY3_hold = false
+  params:set("offset",0)
 end
 
 function window(voice,x)
@@ -395,7 +407,7 @@ function record()
     softcut.rate_slew_time(1,0.01)
     for i = 1, 2 do
       softcut.enable(i, 1)
-      softcut.rate(i, 1)
+      softcut.rate(i, 1*offset)
       softcut.play(i, 1)
       softcut.rec(i, 1)
       softcut.level(i, 0)
@@ -424,8 +436,8 @@ function record()
     rec_time = 0
     softcut.level(1,1)
     softcut.level(2,1)
-    softcut.rate(1,speedlist_1[params:get("speed_voice_1")])
-    softcut.rate(2,speedlist_2[params:get("speed_voice_2")])
+    softcut.rate(1,speedlist_1[params:get("speed_voice_1")]*offset)
+    softcut.rate(2,speedlist_2[params:get("speed_voice_2")]*offset)
   end
   -- if the buffer is NOT clear and key 2 is pressed:
   -- overwrite/overdub behavior will enable
@@ -504,7 +516,7 @@ function key(n,z)
       KEY3_hold = false
       restore_speed()
     end
-  softcut.rate(1,ray)
+  softcut.rate(1,ray*offset)
   end
 
   -- KEY 1
@@ -618,7 +630,7 @@ function redraw()
   screen.update()
   end
 
--- ALL JUST CRANE DRAWING FROM HERE TO END!
+-- crane drawing
 function crane()
   screen.level(13)
   screen.aa(1)
@@ -759,7 +771,6 @@ g.key = function(x,y,z)
     end
   end
 end
-
 
 -- hardware: grid redraw
 function grid_redraw()
