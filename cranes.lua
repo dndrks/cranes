@@ -1,7 +1,7 @@
 -- cranes
 -- dual looper / delay
 -- (grid optional)
--- v2.11 @dan_derks
+-- v2.12 @dan_derks
 -- https://llllllll.co/t/21207
 -- ---------------------
 -- to start:
@@ -25,6 +25,8 @@
 -- ////
 -- head to params to find
 -- speed, vol, pan
+-- +
+-- change buffer 2's reference
 -- \\\\
 
 -- counting ms between key 2 taps
@@ -52,19 +54,10 @@ local TRACKS = 2
 track = {}
 for i=1,TRACKS do
   track[i] = {}
---  track[i].head = (i-1)%4+1
---  track[i].play = 0
---  track[i].rec = 0
---  track[i].rec_level = 1
---  track[i].pre_level = 0
---  track[i].loop = 0
   track[i].start_point = 0
   track[i].end_point = 60
---  track[i].clip = i
   track[i].poll_position = 0
   track[i].pos_grid = -1
---  track[i].speed = 0
---  track[i].rev = 0
 end
 
 distance = {}
@@ -90,8 +83,10 @@ function init()
   softcut.level_input_cut(2, 2, 1.0)
   softcut.pan(1, 0.7)
   softcut.pan(2, 0.3)
+  softcut.buffer(1,1)
+  softcut.buffer(2,2)
   
-  for i = 1, 2 do
+  for i = 1, TRACKS do
     softcut.level(i,1.0)
     softcut.play(i, 1)
     softcut.rate(i, 1*offset)
@@ -129,15 +124,15 @@ function init()
   )
   params:add_separator()
   --
-  params:add_control("speed1_midi","midi ctrl speed v 1", controlspec.new(1,12,'exp',1,12,''))
+  params:add_control("speed1_midi","midi ctrl speed voice 1", controlspec.new(1,12,'exp',1,12,''))
   params:set_action("speed1_midi", function(x) params:set("speed_voice_1", x) end)
   params:set("speed1_midi", 9)
-  params:add_control("speed2_midi","midi ctrl speed v 2", controlspec.new(1,12,'exp',1,12,''))
+  params:add_control("speed2_midi","midi ctrl speed voice 2", controlspec.new(1,12,'exp',1,12,''))
   params:set_action("speed2_midi", function(x) params:set("speed_voice_2", x) end)
   params:set("speed2_midi", 9)
   params:add_separator()
   --
-  params:add_control("offset", "offset", controlspec.new(-24, 24, 'lin', 1, 0, "st"))
+  params:add_control("offset", "global offset", controlspec.new(-24, 24, 'lin', 1, 0, "st"))
   params:set_action("offset",
     function(value)
       offset = math.pow(0.5, -value / 12)
@@ -147,10 +142,22 @@ function init()
   )
   params:add_separator()
   --
-  params:add_control("vol_1","vol voice 1",controlspec.new(0,5,'lin',0,5,''))
+  for i = 1,2 do
+    params:add_control(i .. "lvl_in_L", "lvl in L voice " .. i, controlspec.new(0,1,'lin',0,1,''))
+    params:set_action(i .. "lvl_in_L", function(x) softcut.level_input_cut(1, i, x) end)
+  end
+  params:set(2 .. "lvl_in_L", 0.0)
+  for i = 1,2 do
+    params:add_control(i .. "lvl_in_R", "lvl in R voice " .. i, controlspec.new(0,1,'lin',0,1,''))
+    params:set_action(i .. "lvl_in_R", function(x) softcut.level_input_cut(2, i, x) end)
+  end
+  params:set(1 .. "lvl_in_R", 0.0)
+  params:add_separator()
+  --
+  params:add_control("vol_1","lvl out voice 1",controlspec.new(0,5,'lin',0,5,''))
   params:set_action("vol_1", function(x) softcut.level(1, x) end)
   params:set("vol_1", 1.0)
-  params:add_control("vol_2","vol voice 2",controlspec.new(0,5,'lin',0,5,''))
+  params:add_control("vol_2","lvl out voice 2",controlspec.new(0,5,'lin',0,5,''))
   params:set_action("vol_2", function(x) softcut.level(2, x) end)
   params:set("vol_2", 1.0)
   params:add_separator()
@@ -165,6 +172,9 @@ function init()
   --
   params:add_control("KEY3","KEY3 ( ~~, 0.5, -1, 1.5, 2 )", controlspec.new(0,4,'lin',1,0,''))
   params:set_action("KEY3", function(x) KEY3 = x end)
+  params:add_control("voice_2_buffer","voice 2 buffer reference",controlspec.new(1,2,'lin',1,0,''))
+  params:set_action("voice_2_buffer", function(x) softcut.buffer(2,x) end)
+  params:set("voice_2_buffer",2)
   
   counter = metro.init(count, 0.01, -1)
   rec_time = 0
@@ -307,8 +317,7 @@ function restore_speed()
 end
 
 function clear_all()
-  --softcut.poll_stop_phase()
-  for i = 1, 2 do
+  for i = 1, TRACKS do
     softcut.rec_level(i, 1)
     softcut.level(i, 0)
     softcut.play(i, 0)
@@ -405,7 +414,7 @@ function record()
   if rec % 2 == 1 and clear == 1 then
     softcut.buffer_clear()
     softcut.rate_slew_time(1,0.01)
-    for i = 1, 2 do
+    for i = 1, TRACKS do
       softcut.enable(i, 1)
       softcut.rate(i, 1*offset)
       softcut.play(i, 1)
@@ -480,8 +489,8 @@ track[2].start_point = 0
 track[1].end_point = 60
 track[2].end_point = 60
 over = 0
-over_1 = 0
-over_2 = 0
+over_1 = 0.0
+over_2 = 0.0
 clear = 1
 ray = 0.0
 KEY3 = 0
@@ -491,6 +500,7 @@ c2 = math.random(4,12)
 
 -- key hardware interaction
 function key(n,z)
+  
   -- KEY 2
   if n == 2 and z == 1 then
     record()
