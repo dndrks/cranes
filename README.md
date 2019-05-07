@@ -37,7 +37,7 @@ quick start:
 
 **changelog:**
 
-*2.12*
+*5/7/2019, cranes 2.12*
 - exposed param for input levels
 - created param to switch which buffer voice 2 references (buffer 1 or buffer 2). default (2) is "new cranes", where both buffers are only written simultaneously during paper crane. switch this param (2 -> 1) to unlock "old cranes", where voice 2 references buffer 1 for pitched delays and all kind of cool things.
 - generic code optimization
