@@ -35,7 +35,8 @@ quick start:
 - *start point adjustment* + *end point adjustment*: add or subtract time from the voice’s start and end points, in 0.01 second or 0.1 second increments
 - *window adjustment*: adjust voice’s loop window by 0.01 second increments or by the distance between the start and end points
 
-** changelog **
+**changelog**
+
 2.12
 - exposed param for input levels
 - created param to switch which buffer voice 2 references (buffer 1 or buffer 2). default (2) is "new cranes", where both buffers are only written simultaneously during paper crane. switch this param (2 -> 1) to unlock "old cranes", where voice 2 references buffer 1 for pitched delays and all kind of cool things.
