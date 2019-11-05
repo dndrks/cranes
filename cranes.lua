@@ -1,7 +1,7 @@
 -- cranes
 -- dual looper / delay
 -- (grid optional)
--- v2.12 @dan_derks
+-- v2.13 @dan_derks
 -- https://llllllll.co/t/21207
 -- ---------------------
 -- to start:
