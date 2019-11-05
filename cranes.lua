@@ -74,15 +74,13 @@ function init()
   g = grid.connect()
 
   softcut.buffer_clear()
-  audio.level_cut(1)
+  --audio.level_cut(1)
   audio.level_adc_cut(1)
   audio.level_eng_cut(0)
   softcut.level_input_cut(1, 1, 1.0)
   softcut.level_input_cut(1, 2, 0.0)
   softcut.level_input_cut(2, 1, 0.0)
   softcut.level_input_cut(2, 2, 1.0)
-  softcut.pan(1, -1.)
-  softcut.pan(2, 1.)
   softcut.buffer(1,1)
   softcut.buffer(2,2)
   
@@ -164,17 +162,37 @@ function init()
   --
   params:add_control("pan_1","pan voice 1",controlspec.new(-1,1,'lin',0.01,-1,''))
   params:set_action("pan_1", function(x) softcut.pan(1, x) end)
-  params:set("pan_1", -1)
+  params:add_control("pan_slew_1","pan slew 1", controlspec.new(0, 200, "lin", 0.01, 50, ""))
+  params:set_action("pan_slew_1", function(x) softcut.pan_slew_time(1, x) end)
   params:add_control("pan_2","pan voice 2",controlspec.new(-1,1,'lin',0.01,1,''))
   params:set_action("pan_2", function(x) softcut.pan(2, x) end)
-  params:set("pan_2", 1)
+  params:add_control("pan_slew_2","pan slew 2", controlspec.new(0, 200, "lin", 0.01, 50, ""))
+  params:set_action("pan_slew_2", function(x) softcut.pan_slew_time(2, x) end)
   params:add_separator()
   --
-  params:add_control("KEY3","KEY3 ( ~~, 0.5, -1, 1.5, 2 )", controlspec.new(0,4,'lin',1,0,''))
+  local p = softcut.params()
+  for i = 1,2 do
+    params:add_control("post_filter_fc_"..i,i.." filter cutoff",controlspec.new(0,12000,'lin',0.01,12000,''))
+    params:set_action("post_filter_fc_"..i, function(x) softcut.post_filter_fc(i,x) end)
+    params:add_control("post_filter_lp_"..i,i.." lopass",controlspec.new(0,1,'lin',0,1,''))
+    params:set_action("post_filter_lp_"..i, function(x) softcut.post_filter_lp(i,x) end)
+    params:add_control("post_filter_hp_"..i,i.." hipass",controlspec.new(0,1,'lin',0.01,0,''))
+    params:set_action("post_filter_hp_"..i, function(x) softcut.post_filter_hp(i,x) end)
+    params:add_control("post_filter_bp_"..i,i.." bandpass",controlspec.new(0,1,'lin',0.01,0,''))
+    params:set_action("post_filter_bp_"..i, function(x) softcut.post_filter_bp(i,x) end)
+    params:add_control("post_filter_dry_"..i,i.." dry",controlspec.new(0,1,'lin',0.01,0,''))
+    params:set_action("post_filter_dry_"..i, function(x) softcut.post_filter_dry(i,x) end)
+    params:add_control("post_filter_rq_"..i,i.." resonance (0 = high)",controlspec.new(0,2,'lin',0.01,2,''))
+    params:set_action("post_filter_rq_"..i, function(x) softcut.post_filter_rq(i,x) end)
+  end
+  params:add_separator()
+  params:add_option("KEY3","KEY3", {"~~", "0.5", "-1", "1.5", "2"}, 1)
   params:set_action("KEY3", function(x) KEY3 = x end)
   params:add_control("voice_2_buffer","voice 2 buffer reference",controlspec.new(1,2,'lin',1,0,''))
   params:set_action("voice_2_buffer", function(x) softcut.buffer(2,x) end)
   params:set("voice_2_buffer",2)
+  
+  params:bang()
   
   counter = metro.init(count, 0.01, -1)
   rec_time = 0
@@ -493,7 +511,7 @@ over_1 = 0.0
 over_2 = 0.0
 clear = 1
 ray = 0.0
-KEY3 = 0
+KEY3 = 1
 crane_redraw = 0
 crane2_redraw = 0
 c2 = math.random(4,12)
@@ -511,15 +529,15 @@ function key(n,z)
   if n == 3 then
     if z == 1 then
       KEY3_hold = true
-        if KEY3 == 0 then
+        if KEY3 == 1 then
           warble()
-        elseif KEY3 == 1 then
-          half_speed()
         elseif KEY3 == 2 then
-          rev_speed()
+          half_speed()
         elseif KEY3 == 3 then
-          oneandahalf_speed()
+          rev_speed()
         elseif KEY3 == 4 then
+          oneandahalf_speed()
+        elseif KEY3 == 5 then
           double_speed()
         end
     elseif z == 0 then
