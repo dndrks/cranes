@@ -351,6 +351,14 @@ function clear_all()
   track[2].start_point = 0
   track[1].end_point = 60
   track[2].end_point = 60
+
+  --Reset position after clearing
+  --Mostly for UI
+  track[1].poll_position = 0
+  track[2].poll_position = 0
+  softcut.position(1, 0)
+  softcut.position(2, 0)
+
   clear = 1
   rec_time = 0
   rec = 0
@@ -552,6 +560,15 @@ function key(n,z)
   if n == 1 and z == 1 and KEY3_hold == true then
     clear_all()
     KEY1_hold = false
+
+    -- Proposed fix to allow clear and re-record 
+    softcut.buffer_clear()
+    for i = 1, TRACKS do
+      softcut.loop_start(i, 0)
+      softcut.position(i, 0)
+    end
+    softcut.event_phase(phase)
+
   elseif n == 1 and z == 1 then
     KEY1_press = KEY1_press + 1
     if rec % 2 == 1 then
