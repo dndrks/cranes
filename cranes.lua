@@ -1,7 +1,7 @@
 -- cranes
 -- dual looper / delay
 -- (grid optional)
--- v2.13 @dan_derks
+-- v220324 @dan_derks
 -- https://llllllll.co/t/21207
 -- ---------------------
 -- to start:
@@ -29,28 +29,36 @@
 -- change buffer 2's reference
 -- \\\\
 
+_params = include 'lib/params'
+
+function r()
+  norns.script.load(norns.state.script)
+end
+
 -- counting ms between key 2 taps
 -- sets loop length
 function count()
-  rec_time = rec_time + 0.01
+  rec_time = rec_time + 0.005
 end
 
 -- track recording state
 rec = 0
-local offset=1
+offset = 1
 
-local cs = require 'controlspec'
-
-local presets = {}
-local presets_1 = {}
-local presets_2 = {}
-
-preset_count = {}
+presets = {
+  [1] = {},
+  [2] = {}
+}
 for i = 1,2 do
-  preset_count[i] = 0
+  for j = 1,12 do
+    presets[i][j] = {}
+  end
 end
+-- presets[voice][coll].start_point = track[voice].start_point
+preset_count = {0,0}
+selected_preset = {0,0}
 
-local TRACKS = 2
+TRACKS = 2
 track = {}
 for i=1,TRACKS do
   track[i] = {}
@@ -60,15 +68,7 @@ for i=1,TRACKS do
   track[i].pos_grid = -1
 end
 
-distance = {}
-for i = 1,2 do
-  distance[i] = 0
-end
-
-selected_preset = {}
-for i = 1,2 do
-  selected_preset[i] = 0
-end
+distance = {0,0}
 
 function init()
   g = grid.connect()
@@ -96,202 +96,77 @@ function init()
     softcut.rec_level(i, 1)
     softcut.pre_level(i, 1)
     softcut.position(i, 0)
-    softcut.phase_quant(i, 0.03)
+    softcut.phase_quant(i, 0.01)
     softcut.rec_offset(i, -0.0003)
   end
  
   softcut.event_phase(phase)
 
-  params:add_option("speed_voice_1","speed voice 1", speedlist_1)
-  params:set("speed_voice_1", 9)
-  params:set_action("speed_voice_1",
-    function(x)
-      softcut.rate(1, speedlist_1[params:get("speed_voice_1")]*offset)
-      params:set("speed1_midi", params:get("speed_voice_1"))
-      grid_redraw()
-    end
-  )
-  params:add_option("speed_voice_2","speed voice 2", speedlist_2)
-  params:set("speed_voice_2", 9)
-  params:set_action("speed_voice_2",
-    function(x)
-      softcut.rate(2, speedlist_2[params:get("speed_voice_2")]*offset)
-      params:set("speed2_midi", params:get("speed_voice_2"))
-      grid_redraw()
-    end
-  )
-  params:add_separator()
-  --
-  params:add_control("speed1_midi","midi ctrl speed voice 1", controlspec.new(1,12,'exp',1,12,''))
-  params:set_action("speed1_midi", function(x) params:set("speed_voice_1", x) end)
-  params:set("speed1_midi", 9)
-  params:add_control("speed2_midi","midi ctrl speed voice 2", controlspec.new(1,12,'exp',1,12,''))
-  params:set_action("speed2_midi", function(x) params:set("speed_voice_2", x) end)
-  params:set("speed2_midi", 9)
-  params:add_separator()
-  --
-  params:add_control("offset", "global offset", controlspec.new(-24, 24, 'lin', 1, 0, "st"))
-  params:set_action("offset",
-    function(value)
-      offset = math.pow(0.5, -value / 12)
-      softcut.rate(1,speedlist_1[params:get("speed_voice_1")]*offset)
-      softcut.rate(2,speedlist_2[params:get("speed_voice_2")]*offset)
-    end
-  )
-  params:add_separator()
-  --
-  for i = 1,2 do
-    params:add_control(i .. "lvl_in_L", "lvl in L voice " .. i, controlspec.new(0,1,'lin',0,1,''))
-    params:set_action(i .. "lvl_in_L", function(x) softcut.level_input_cut(1, i, x) end)
-  end
-  params:set(2 .. "lvl_in_L", 0.0)
-  for i = 1,2 do
-    params:add_control(i .. "lvl_in_R", "lvl in R voice " .. i, controlspec.new(0,1,'lin',0,1,''))
-    params:set_action(i .. "lvl_in_R", function(x) softcut.level_input_cut(2, i, x) end)
-  end
-  params:set(1 .. "lvl_in_R", 0.0)
-  params:add_separator()
-  --
-  params:add_control("vol_1","lvl out voice 1",controlspec.new(0,5,'lin',0,5,''))
-  params:set_action("vol_1", function(x) softcut.level(1, x) end)
-  params:set("vol_1", 1.0)
-  params:add_control("vol_2","lvl out voice 2",controlspec.new(0,5,'lin',0,5,''))
-  params:set_action("vol_2", function(x) softcut.level(2, x) end)
-  params:set("vol_2", 1.0)
-  params:add_separator()
-  --
-  params:add_control("pan_1","pan voice 1",controlspec.new(-1,1,'lin',0.01,-1,''))
-  params:set_action("pan_1", function(x) softcut.pan(1, x) end)
-  params:add_control("pan_slew_1","pan slew 1", controlspec.new(0, 200, "lin", 0.01, 50, ""))
-  params:set_action("pan_slew_1", function(x) softcut.pan_slew_time(1, x) end)
-  params:add_control("pan_2","pan voice 2",controlspec.new(-1,1,'lin',0.01,1,''))
-  params:set_action("pan_2", function(x) softcut.pan(2, x) end)
-  params:add_control("pan_slew_2","pan slew 2", controlspec.new(0, 200, "lin", 0.01, 50, ""))
-  params:set_action("pan_slew_2", function(x) softcut.pan_slew_time(2, x) end)
-  params:add_separator()
-  --
-  local p = softcut.params()
-  for i = 1,2 do
-    params:add_control("post_filter_fc_"..i,i.." filter cutoff",controlspec.new(0,12000,'lin',0.01,12000,''))
-    params:set_action("post_filter_fc_"..i, function(x) softcut.post_filter_fc(i,x) end)
-    params:add_control("post_filter_lp_"..i,i.." lopass",controlspec.new(0,1,'lin',0,1,''))
-    params:set_action("post_filter_lp_"..i, function(x) softcut.post_filter_lp(i,x) end)
-    params:add_control("post_filter_hp_"..i,i.." hipass",controlspec.new(0,1,'lin',0.01,0,''))
-    params:set_action("post_filter_hp_"..i, function(x) softcut.post_filter_hp(i,x) end)
-    params:add_control("post_filter_bp_"..i,i.." bandpass",controlspec.new(0,1,'lin',0.01,0,''))
-    params:set_action("post_filter_bp_"..i, function(x) softcut.post_filter_bp(i,x) end)
-    params:add_control("post_filter_dry_"..i,i.." dry",controlspec.new(0,1,'lin',0.01,0,''))
-    params:set_action("post_filter_dry_"..i, function(x) softcut.post_filter_dry(i,x) end)
-    params:add_control("post_filter_rq_"..i,i.." resonance (0 = high)",controlspec.new(0,2,'lin',0.01,2,''))
-    params:set_action("post_filter_rq_"..i, function(x) softcut.post_filter_rq(i,x) end)
-  end
-  params:add_separator()
-  params:add_option("KEY3","KEY3", {"~~", "0.5", "-1", "1.5", "2"}, 1)
-  params:set_action("KEY3", function(x) KEY3 = x end)
-  params:add_control("voice_2_buffer","voice 2 buffer reference",controlspec.new(1,2,'lin',1,0,''))
-  params:set_action("voice_2_buffer", function(x) softcut.buffer(2,x) end)
-  params:set("voice_2_buffer",2)
+  _params.init()
   
-  params:bang()
-  
-  counter = metro.init(count, 0.01, -1)
+  counter = metro.init(count, 0.005, -1)
   rec_time = 0
 
   KEY3_hold = false
   KEY1_hold = false
   KEY1_press = 0
   clear_all()
-  
-  grid_redraw()
-  g:refresh()
+
+  hardware_redraw = metro.init(
+    function()
+      draw_hardware()
+    end
+    , 1/30, -1)
+  hardware_redraw:start()
+
+  grid_dirty = true
+  screen_dirty = true
   
   softcut.poll_start_phase()
 end
 
+function draw_hardware()
+  if grid_dirty then
+    grid_redraw()
+    grid_dirty = false
+  end
+  if screen_dirty then
+    redraw()
+    screen_dirty = false
+  end
+end
+
 phase = function(n, x)
-  if n == 1 then
-    track[1].poll_position = x
-    pp = ((x - track[1].start_point) / (track[1].end_point - track[1].start_point))
-    x = math.floor(pp * 16)
-    if x ~= track[n].pos_grid then
-      track[n].pos_grid = x
-    end
-  elseif n == 2 then
-    track[2].poll_position = x
-    pp = ((x - track[2].start_point) / (track[2].end_point - track[2].start_point))
-    x = math.floor(pp * 16)
-    if x ~= track[n].pos_grid then
-      track[n].pos_grid = x
-    end
+  track[n].poll_position = x
+  pp = ((x - track[n].start_point) / (track[n].end_point - track[n].start_point))
+  x = math.floor(pp * 16)
+  if x ~= track[n].pos_grid then
+    track[n].pos_grid = x
   end
-  grid_redraw()
-  redraw()
+  grid_dirty = true
+  screen_dirty = true
 end
 
-function preset_pack(voice)
-  if voice == 1 then
-    table.insert(presets_1, track[1].start_point)
-    table.insert(presets_1, track[1].end_point)
-    table.insert(presets_1, track[1].poll_position)
-    table.insert(presets_1, params:get("speed_voice_1"))
-    preset_pool_1 = { {presets_1[1],presets_1[2],presets_1[3],presets_1[4]},
-                    {presets_1[5],presets_1[6],presets_1[7],presets_1[8]},
-                    {presets_1[9],presets_1[10],presets_1[11],presets_1[12]},
-                    {presets_1[13],presets_1[14],presets_1[15],presets_1[16]},
-                    {presets_1[17],presets_1[18],presets_1[19],presets_1[20]},
-                    {presets_1[21],presets_1[22],presets_1[23],presets_1[24]},
-                    {presets_1[25],presets_1[26],presets_1[27],presets_1[28]},
-                    {presets_1[29],presets_1[30],presets_1[31],presets_1[32]},
-                    {presets_1[33],presets_1[34],presets_1[35],presets_1[36]},
-                    {presets_1[37],presets_1[38],presets_1[39],presets_1[40]},
-                    {presets_1[41],presets_1[42],presets_1[43],presets_1[44]},
-                    {presets_1[45],presets_1[46],presets_1[47],presets_1[48]},
-                    {presets_1[49],presets_1[50],presets_1[51],presets_1[52]} }
-  elseif voice == 2 then
-    table.insert(presets_2, track[2].start_point)
-    table.insert(presets_2, track[2].end_point)
-    table.insert(presets_2, track[2].poll_position)
-    table.insert(presets_2, params:get("speed_voice_2"))
-    preset_pool_2 = { {presets_2[1],presets_2[2],presets_2[3],presets_2[4]},
-                    {presets_2[5],presets_2[6],presets_2[7],presets_2[8]},
-                    {presets_2[9],presets_2[10],presets_2[11],presets_2[12]},
-                    {presets_2[13],presets_2[14],presets_2[15],presets_2[16]},
-                    {presets_2[17],presets_2[18],presets_2[19],presets_2[20]},
-                    {presets_2[21],presets_2[22],presets_2[23],presets_2[24]},
-                    {presets_2[25],presets_2[26],presets_2[27],presets_2[28]},
-                    {presets_2[29],presets_2[30],presets_2[31],presets_2[32]},
-                    {presets_2[33],presets_2[34],presets_2[35],presets_2[36]},
-                    {presets_2[37],presets_2[38],presets_2[39],presets_2[40]},
-                    {presets_2[41],presets_2[42],presets_2[43],presets_2[44]},
-                    {presets_2[45],presets_2[46],presets_2[47],presets_2[48]},
-                    {presets_2[49],presets_2[50],presets_2[51],presets_2[52]} }
-  end
+function preset_pack(voice,coll)
+  presets[voice][coll].start_point = track[voice].start_point
+  presets[voice][coll].end_point = track[voice].end_point
+  presets[voice][coll].poll_position = track[voice].poll_position
+  presets[voice][coll].rate = params:get("speed_voice_"..voice)
 end
 
-function preset_unpack(voice, set)
-  if voice == 1 then
-    track[1].start_point = preset_pool_1[set][1]
-    softcut.loop_start(1,track[1].start_point)
-    track[1].end_point = preset_pool_1[set][2]
-    softcut.loop_end(1,track[1].end_point)
-    softcut.position(1,preset_pool_1[set][3])
-    params:set("speed_voice_1", preset_pool_1[set][4])
-  elseif voice == 2 then
-    track[2].start_point = preset_pool_2[set][1]
-    softcut.loop_start(2,track[2].start_point)
-    track[2].end_point = preset_pool_2[set][2]
-    softcut.loop_end(2,track[2].end_point)
-    softcut.position(2,preset_pool_2[set][3])
-    params:set("speed_voice_2", preset_pool_2[set][4])
-  end
-  redraw()
-  g:all(0)
-  grid_redraw()
-  g:refresh()
+function preset_unpack(voice, coll)
+  track[voice].start_point = presets[voice][coll].start_point
+  softcut.loop_start(voice,track[voice].start_point)
+  track[voice].end_point = presets[voice][coll].end_point
+  softcut.loop_end(voice,track[voice].end_point)
+  softcut.position(voice,presets[voice][coll].poll_position)
+  params:set("speed_voice_1", presets[voice][coll].rate)
+  screen_dirty = true
+  grid_dirty = true
 end
 
 function warble()
-  local bufSpeed1 = speedlist_1[params:get("speed_voice_1")]
+  local bufSpeed1 = speedlist[1][params:get("speed_voice_1")]
   if bufSpeed1 > 1.99 then
       ray = bufSpeed1 + (math.random(-15,15)/1000)
     elseif bufSpeed1 >= 1.0 then
@@ -305,33 +180,33 @@ function warble()
 end
 
 function half_speed()
-  ray = speedlist_1[params:get("speed_voice_1")] / 2
+  ray = speedlist[1][params:get("speed_voice_1")] / 2
   softcut.rate_slew_time(1,0.6 + (math.random(-30,10)/100))
 end
 
 function rev_speed()
-  ray = speedlist_1[params:get("speed_voice_1")] * -1
+  ray = speedlist[1][params:get("speed_voice_1")] * -1
   softcut.rate_slew_time(1,0.01)
 end
 
 function oneandahalf_speed()
-  ray = speedlist_1[params:get("speed_voice_1")] * 1.5
+  ray = speedlist[1][params:get("speed_voice_1")] * 1.5
   softcut.rate_slew_time(1,0.6 + (math.random(-30,10)/100))
 end
 
 function double_speed()
-  ray = speedlist_1[params:get("speed_voice_1")] * 2
+  ray = speedlist[1][params:get("speed_voice_1")] * 2
   softcut.rate_slew_time(1,0.6 + (math.random(-30,10)/100))
 end
 
 function restore_speed()
-  ray = speedlist_1[params:get("speed_voice_1")]
+  ray = speedlist[1][params:get("speed_voice_1")]
   if params:get("KEY3") == 2 then
     softcut.rate_slew_time(1,0.01)
   else
     softcut.rate_slew_time(1,0.6)
   end
-  softcut.rate(1,speedlist_1[params:get("speed_voice_1")]*offset)
+  softcut.rate(1,speedlist[1][params:get("speed_voice_1")]*offset)
 end
 
 function clear_all()
@@ -346,7 +221,7 @@ function clear_all()
     softcut.enable(i, 0)
   end
   softcut.buffer_clear()
-  ray = speedlist_1[params:get("speed_voice_1")]
+  ray = speedlist[1][params:get("speed_voice_1")]
   track[1].start_point = 0
   track[2].start_point = 0
   track[1].end_point = 60
@@ -363,66 +238,66 @@ function clear_all()
     g:led(i,8,0)
   end
   g:refresh()
-  redraw()
+  screen_dirty = true
   KEY3_hold = false
   params:set("offset",0)
 end
 
 function window(voice,x)
   if x == 1 then
-      if track[voice].start_point - 0.01 < 0 then
-        track[voice].start_point = 0
-      else
-        track[voice].start_point = track[voice].start_point - 0.01
-      end
-    elseif x == 2 then
-      if track[voice].start_point - 0.1 < 0 then
-        track[voice].start_point = 0
-      else
-        track[voice].start_point = track[voice].start_point - 0.1
-      end
-    elseif x == 3 then
-      track[voice].start_point = track[voice].start_point + 0.1
-    elseif x == 4 then
-      track[voice].start_point = track[voice].start_point + 0.01
-    elseif x == 8 and track[voice].start_point > 0.009 then
-      distance[voice] = math.abs(track[voice].start_point - track[voice].end_point)
-      if track[voice].start_point < distance[voice] then
-        track[voice].start_point = 0
-      else
-        track[voice].start_point = track[voice].start_point - distance[voice]
-      end
-      track[voice].end_point = track[voice].end_point - distance[voice]
-    elseif x == 7 and track[voice].start_point > 0.009 then
+    if track[voice].start_point - 0.01 < 0 then
+      track[voice].start_point = 0
+    else
       track[voice].start_point = track[voice].start_point - 0.01
+    end
+  elseif x == 2 then
+    if track[voice].start_point - 0.1 < 0 then
+      track[voice].start_point = 0
+    else
+      track[voice].start_point = track[voice].start_point - 0.1
+    end
+  elseif x == 3 then
+    track[voice].start_point = track[voice].start_point + 0.1
+  elseif x == 4 then
+    track[voice].start_point = track[voice].start_point + 0.01
+  elseif x == 8 and track[voice].start_point > 0.009 then
+    distance[voice] = math.abs(track[voice].start_point - track[voice].end_point)
+    if track[voice].start_point < distance[voice] then
+      track[voice].start_point = 0
+    else
+      track[voice].start_point = track[voice].start_point - distance[voice]
+    end
+    track[voice].end_point = track[voice].end_point - distance[voice]
+  elseif x == 7 and track[voice].start_point > 0.009 then
+    track[voice].start_point = track[voice].start_point - 0.01
+    track[voice].end_point = track[voice].end_point - 0.01
+  elseif x == 10 then
+    track[voice].start_point = track[voice].start_point + 0.01
+    track[voice].end_point = track[voice].end_point + 0.01
+  elseif x == 9 then
+    distance[voice] = math.abs(track[voice].start_point - track[voice].end_point)
+    track[voice].start_point = track[voice].start_point + distance[voice]
+    track[voice].end_point = track[voice].end_point + distance[voice]
+  elseif x == 13 then
+    if track[voice].end_point - 0.1 < 0 then
+      track[voice].end_point = 0
+    else
       track[voice].end_point = track[voice].end_point - 0.01
-    elseif x == 10 then
-      track[voice].start_point = track[voice].start_point + 0.01
-      track[voice].end_point = track[voice].end_point + 0.01
-    elseif x == 9 then
-      distance[voice] = math.abs(track[voice].start_point - track[voice].end_point)
-      track[voice].start_point = track[voice].start_point + distance[voice]
-      track[voice].end_point = track[voice].end_point + distance[voice]
-    elseif x == 13 then
-      if track[voice].end_point - 0.1 < 0 then
-        track[voice].end_point = 0
-      else
-        track[voice].end_point = track[voice].end_point - 0.01
-      end
-    elseif x == 14 then
-      if track[voice].end_point - 0.1 < 0 then
-        track[voice].end_point = 0
-      else
-        track[voice].end_point = track[voice].end_point - 0.1
-      end
-    elseif x == 15 then
-      track[voice].end_point = track[voice].end_point + 0.1
-    elseif x == 16 then
-      track[voice].end_point = track[voice].end_point + 0.01
+    end
+  elseif x == 14 then
+    if track[voice].end_point - 0.1 < 0 then
+      track[voice].end_point = 0
+    else
+      track[voice].end_point = track[voice].end_point - 0.1
+    end
+  elseif x == 15 then
+    track[voice].end_point = track[voice].end_point + 0.1
+  elseif x == 16 then
+    track[voice].end_point = track[voice].end_point + 0.01
   end
-    softcut.loop_start(voice,track[voice].start_point)
-    softcut.loop_end(voice,track[voice].end_point)
-    redraw()
+  softcut.loop_start(voice,track[voice].start_point)
+  softcut.loop_end(voice,track[voice].end_point)
+  screen_dirty = true
 end
 
 function record()
@@ -440,7 +315,7 @@ function record()
       softcut.level(i, 0)
     end
     crane_redraw = 1
-    redraw()
+    screen_dirty = true
     counter:start()
   -- if the buffer is clear and key 2 is pressed again:
   -- main recording will disable, loop points set
@@ -459,21 +334,21 @@ function record()
     softcut.loop_start(2,0)
     track[2].start_point = 0
     crane_redraw = 0
-    redraw()
+    screen_dirty = true
     rec_time = 0
     softcut.level(1,1)
     softcut.level(2,1)
-    softcut.rate(1,speedlist_1[params:get("speed_voice_1")]*offset)
-    softcut.rate(2,speedlist_2[params:get("speed_voice_2")]*offset)
+    softcut.rate(1,speedlist[1][params:get("speed_voice_1")]*offset)
+    softcut.rate(2,speedlist[2][params:get("speed_voice_2")]*offset)
   end
   -- if the buffer is NOT clear and key 2 is pressed:
   -- overwrite/overdub behavior will enable
   if rec % 2 == 1 and clear == 0 and KEY1_press % 2 == 0 then
     softcut.rec_level(1,1)
-    softcut.pre_level(1,math.abs(over_1-1))
+    softcut.pre_level(1,math.abs(over[1]-1))
     crane_redraw = 1
     crane2_redraw = 1
-    redraw()
+    screen_dirty = true
   -- if the buffer is NOT clear and key 2 is pressed again:
   -- overwrite/overdub behavior will disable
   elseif rec % 2 == 0 and clear == 0 and KEY1_press % 2 == 0 then
@@ -481,34 +356,34 @@ function record()
     softcut.pre_level(1,1)
     crane_redraw = 0
     crane2_redraw = 0
-    redraw()
+    screen_dirty = true
   elseif rec % 2 == 1 and clear == 0 and KEY1_press % 2 == 1 then
     softcut.rec_level(2,1)
-    softcut.pre_level(2,math.abs(over_2-1))
+    softcut.pre_level(2,math.abs(over[2]-1))
     crane_redraw = 1
     crane2_redraw = 1
-    redraw()
+    screen_dirty = true
   elseif rec % 2 == 0 and clear == 0 and KEY1_press % 2 == 1 then
     softcut.rec_level(2,0)
     softcut.pre_level(2,1)
     crane_redraw = 0
     crane2_redraw = 0
-    redraw()
+    screen_dirty = true
   end
 end
 
 -- variable dump
 down_time = 0
 hold_time = 0
-speedlist_1 = {-4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0}
-speedlist_2 = {-4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0}
+speedlist = {
+  {-4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0},
+  {-4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0}
+}
 track[1].start_point = 0
 track[2].start_point = 0
 track[1].end_point = 60
 track[2].end_point = 60
-over = 0
-over_1 = 0.0
-over_2 = 0.0
+over = {0,0}
 clear = 1
 ray = 0.0
 KEY3 = 1
@@ -544,7 +419,7 @@ function key(n,z)
       KEY3_hold = false
       restore_speed()
     end
-  softcut.rate(1,ray*offset)
+    softcut.rate(1,ray*offset)
   end
 
   -- KEY 1
@@ -561,63 +436,44 @@ function key(n,z)
         softcut.pre_level(1,1)
       elseif KEY1_press % 2 == 0 then
         softcut.rec_level(2,0)
-        sofcut.pre_level(2,1)
+        softcut.pre_level(2,1)
       end
       crane_redraw = 0
       crane2_redraw = 0
-      redraw()
+      screen_dirty = true
     end
     KEY1_hold = true
-    redraw()
+    screen_dirty = true
   elseif n == 1 and z == 0 then
     KEY1_hold = false
-    redraw()
+    screen_dirty = true
   end
 end
 
 -- encoder hardware interaction
 function enc(n,d)
-
+  local _t = KEY1_press % 2 == 0 and 1 or 2
   -- encoder 3: voice 1's loop end point
   if n == 3 and KEY1_press % 2 == 0 then
-    track[1].end_point = util.clamp((track[1].end_point + d/10),0.0,60.0)
-    softcut.loop_end(1,track[1].end_point)
-    redraw()
+    track[_t].end_point = util.clamp((track[_t].end_point + d/10),0.0,60.0)
+    softcut.loop_end(_t,track[_t].end_point)
+    screen_dirty = true
 
   -- encoder 2: voice 1's loop start point
   elseif n == 2 and KEY1_press % 2 == 0 then
-    track[1].start_point = util.clamp((track[1].start_point + d/10),0.0,60.0)
-    softcut.loop_start(1,track[1].start_point)
-    redraw()
-
--- encoder 3: voice 2's loop end point
-  elseif n == 3 and KEY1_press % 2 == 1 then
-    track[2].end_point = util.clamp((track[2].end_point + d/10),0.0,60.0)
-    softcut.loop_end(2,track[2].end_point)
-    redraw()
-
--- encoder 2: voice 2's loop start point
-  elseif n == 2 and KEY1_press % 2 == 1 then
-    track[2].start_point = util.clamp((track[2].start_point + d/10),0.0,60.0)
-    softcut.loop_start(2,track[2].start_point)
-    redraw()
+    track[_t].start_point = util.clamp((track[_t].start_point + d/10),0.0,60.0)
+    softcut.loop_start(_t,track[_t].start_point)
+    screen_dirty = true
 
   -- encoder 1: voice 1's overwrite/overdub amount
   -- 0 is full overdub
   -- 1 is full overwrite
   elseif n == 1 then
-    if KEY1_press % 2 == 0 then
-      over_1 = util.clamp((over_1 + d/100), 0.0,1.0)
-      if rec % 2 == 1 then
-        softcut.pre_level(1,math.abs(over_1-1))
-      end
-    elseif KEY1_press % 2 == 1 then
-      over_2 = util.clamp((over_2 + d/100), 0.0,1.0)
-        if rec % 2 == 1 then
-          softcut.pre_level(2,math.abs(over_2-1))
-        end
+    over[_t] = util.clamp((over[_t] + d/100), 0.0,1.0)
+    if rec % 2 == 1 then
+      softcut.pre_level(_t,math.abs(over[_t]-1))
     end
-    redraw()
+    screen_dirty = true
   end
 end
 
@@ -626,23 +482,12 @@ function redraw()
   screen.clear()
   screen.level(15)
   screen.move(0,50)
-    if KEY1_press % 2 == 1 then
-      screen.text("s2: "..math.ceil(track[2].start_point * (10^2))/(10^2))
-    elseif KEY1_press % 2 == 0 then
-      screen.text("s1: "..math.ceil(track[1].start_point * (10^2))/(10^2))
-    end
+  local _t = KEY1_press % 2 == 0 and 1 or 2
+  screen.text("s".._t..": "..math.ceil(track[_t].start_point * (10^2))/(10^2))
   screen.move(0,60)
-    if KEY1_press % 2 == 1 then
-      screen.text("e2: "..math.ceil(track[2].end_point * (10^2))/(10^2))
-    elseif KEY1_press % 2 == 0 then
-      screen.text("e1: "..math.ceil(track[1].end_point * (10^2))/(10^2))
-    end
+  screen.text("e".._t..": "..math.ceil(track[_t].end_point * (10^2))/(10^2))
   screen.move(0,40)
-    if KEY1_press % 2 == 1 then
-      screen.text("o2: "..over_2)
-    elseif KEY1_press % 2 == 0 then
-      screen.text("o1: "..over_1)
-    end
+  screen.text("o".._t..": "..over[_t])
   if crane_redraw == 1 then
     if crane2_redraw == 0 then
       crane()
@@ -726,7 +571,7 @@ g = grid.connect()
 g.key = function(x,y,z)
 -- speed + direction
   if y == 1 and z == 1 then
-    if x <= #speedlist_1 then
+    if x <= #speedlist[1] then
       params:set("speed_voice_1",x)
     elseif x == 13 then
       softcut.position(1,track[2].poll_position)
@@ -738,10 +583,9 @@ g.key = function(x,y,z)
     elseif x == 15 then
       softcut.position(1,track[1].start_point)
     end
-    grid_redraw()
-  end
-  if y == 5 and z == 1 then
-    if x <=#speedlist_2 then
+    grid_dirty = true
+  elseif y == 5 and z == 1 then
+    if x <=#speedlist[2] then
       params:set("speed_voice_2",x)
     elseif x == 13 then
       softcut.position(2,track[1].poll_position)
@@ -753,50 +597,34 @@ g.key = function(x,y,z)
     elseif x == 15 then
       softcut.position(2,track[2].start_point)
     end
-    grid_redraw()
-  end
+    grid_dirty = true
 -- presets
-  if y == 2 and z == 1 then
-    if x < 14 and x < preset_count[1]+1 then
-      preset_unpack(1, x)
-      selected_preset[1] = x
+  elseif (y == 2 or y == 6) and z == 1 then
+    local _t = y == 2 and 1 or 2
+    if x < 14 and x < preset_count[_t]+1 then
+      preset_unpack(_t, x)
+      selected_preset[_t] = x
     elseif x == 15 then
-      presets_1 = {}
-      preset_pool_1 = {}
-      preset_count[1] = 0
-      selected_preset[1] = 0
+      for i = 1,12 do
+        presets[_t][i] = {}
+      end
+      preset_count[_t] = 0
+      selected_preset[_t] = 0
     elseif x == 16 then
-      preset_pack(1)
-      if preset_count[1] < 13 then
-      preset_count[1] = preset_count[1] + 1
+      if preset_count[_t] < 13 then
+        preset_count[_t] = preset_count[_t] + 1
+        preset_pack(_t, preset_count[_t])
       end
     end
-    grid_redraw()
-  end
-  if y == 6 and z == 1 then
-    if x < 14 and x < preset_count[2]+1 then
-      preset_unpack(2, x)
-      selected_preset[2] = x
-    elseif x == 15 then
-      presets_2 = {}
-      preset_pool_2 = {}
-      preset_count[2] = 0
-      selected_preset[2] = 0
-    elseif x == 16 then
-      preset_pack(2)
-      if preset_count[2] < 13 then
-      preset_count[2] = preset_count[2] + 1
-      end
-    end
-    grid_redraw()
-  end
+    grid_dirty = true
 -- start point, end point, window
-  if y == 3 or 7 then
-    if y == 3 and z == 1 then
-      window(1,x)
-    elseif y == 7 and z == 1 then
-      window(2,x)
-    end
+  elseif (y == 3 or y == 7) and z == 1 then
+    window(y == 3 and 1 or 2, x)
+  elseif (y == 4 or y == 8) and z == 1 then
+    local _t = y == 4 and 1 or 2
+    local _block = (track[_t].end_point - track[_t].start_point) / 16
+    local _cutposition = _block * (x-1)
+    softcut.position(_t,_cutposition)
   end
 end
 
@@ -813,10 +641,10 @@ function grid_redraw()
   g:led(16,2,9)
   g:led(15,6,3)
   g:led(16,6,9)
-  for i=1,#speedlist_1 do
+  for i=1,#speedlist[1] do
     g:led(i,1,5)
   end
-  for i=1,#speedlist_2 do
+  for i=1,#speedlist[2] do
     g:led(i,5,5)
   end
   for i=13,15 do
