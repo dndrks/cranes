@@ -52,7 +52,7 @@ function ca.load_sample(file,sample,summed)
     }
     softcut.buffer_clear_region_channel(scaled[sample][1],scaled[sample][2],60)
     softcut.buffer_read_mono(file, 0, scaled[sample][2], clip[sample].sample_length + 0.05, im_ch, scaled[sample][1])
-    track[sample].end_point = clip[sample].sample_length + softcut_offsets[sample]
+    track[sample].end_point = (clip[sample].sample_length-0.01) + softcut_offsets[sample]
     softcut.enable(sample, 1)
     softcut.play(sample, 1)
     softcut.rec_level(sample,0)

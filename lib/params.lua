@@ -34,7 +34,7 @@ function _params.init()
       end
     )
   end
-  params:add_group("levels",19)
+  params:add_group("levels",23)
   --
   params:add_separator("in")
   for i = 1,4 do
@@ -56,13 +56,35 @@ function _params.init()
   end
 
   params:add_separator("cross")
+  for i = 1,2 do
+    params:add_control("cross_"..i.."_3","feed ["..i.."] into [3]",controlspec.new(0,5,'lin',0,0,''))
+    params:set_action("cross_"..i.."_3", function(x)
+      if params:get("cross_3_"..i) ~= 0 then
+        params:set("cross_3_"..i,0)
+      end
+      softcut.level_cut_cut(i,3,x)
+    end)
+    params:add_control("cross_"..i.."_4","feed ["..i.."] into [4]",controlspec.new(0,5,'lin',0,0,''))
+    params:set_action("cross_"..i.."_4", function(x)
+      if params:get("cross_4_"..i) ~= 0 then
+        params:set("cross_4_"..i,0)
+      end
+      softcut.level_cut_cut(i,4,x)
+    end)
+  end
   for i = 3,4 do
     params:add_control("cross_"..i.."_1","feed ["..i.."] into [1]",controlspec.new(0,5,'lin',0,0,''))
     params:set_action("cross_"..i.."_1", function(x)
+      if params:get("cross_1_"..i) ~= 0 then
+        params:set("cross_1_"..i,0)
+      end
       softcut.level_cut_cut(i,1,x)
     end)
     params:add_control("cross_"..i.."_2","feed ["..i.."] into [2]",controlspec.new(0,5,'lin',0,0,''))
     params:set_action("cross_"..i.."_2", function(x)
+      if params:get("cross_2_"..i) ~= 0 then
+        params:set("cross_2_"..i,0)
+      end
       softcut.level_cut_cut(i,2,x)
     end)
   end
@@ -79,10 +101,10 @@ function _params.init()
     params:set_action("pan_slew_"..i, function(x) softcut.pan_slew_time(i, x) end)
   end
 
-  params:add_group("filters",14)
+  params:add_group("filters",28)
   --
   -- local p = softcut.params() -- TODO VERIFY IF I NEED THIS?
-  for i = 1,TRACKS do
+  for i = 1,4 do
     params:add_separator("voice "..i)
     params:add_control("post_filter_fc_"..i,"filter cutoff",controlspec.new(0,12000,'lin',0.01,12000,''))
     params:set_action("post_filter_fc_"..i, function(x) softcut.post_filter_fc(i,x) end)
@@ -94,7 +116,7 @@ function _params.init()
     params:set_action("post_filter_bp_"..i, function(x) softcut.post_filter_bp(i,x) end)
     params:add_control("post_filter_dry_"..i,"dry",controlspec.new(0,1,'lin',0.01,1,''))
     params:set_action("post_filter_dry_"..i, function(x) softcut.post_filter_dry(i,x) end)
-    params:add_control("post_filter_rq_"..i,"resonance (0 = high)",controlspec.new(0,2,'lin',0.01,2,''))
+    params:add_control("post_filter_rq_"..i,"resonance (0 = high)",controlspec.new(0.01,2,'lin',0.01,2,''))
     params:set_action("post_filter_rq_"..i, function(x) softcut.post_filter_rq(i,x) end)
   end
 
