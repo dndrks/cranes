@@ -2,7 +2,7 @@ local chitter = {}
 
 function chitter.init()
   chitter_stretch = {}
-  for i = 1,TRACKS do
+  for i = 1,4 do
     chitter_stretch[i] = {}
     chitter_stretch[i].enabled = false
     chitter_stretch[i].modes = {"off","woodcock","dove","starling"}
@@ -17,9 +17,9 @@ end
 
 function chitter.init_params()
   chitter.init()
-  params:add_group("flight",8)
-  local bank_names = {"[1]","[2]","[c]"}
-  for i = 1,TRACKS do
+  params:add_group("flight",16)
+  local bank_names = {"[1]","[2]","[3]","[4]"}
+  for i = 1,4 do
     params:add_option("chittering_mode_"..i,"flight mode "..bank_names[i],{"off","woodcock","dove","starling"},1)
     params:set_action("chittering_mode_"..i,function(x)
       if x == 1 then

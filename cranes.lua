@@ -65,12 +65,14 @@ end
 snapshot_count = {0,0}
 selected_snapshot = {0,0}
 
+softcut_offsets = {0,0,100,100}
+
 track = {}
-for i=1,TRACKS do
+for i=1,4 do
   track[i] = {}
-  track[i].start_point = 0
-  track[i].end_point = 60
-  track[i].poll_position = 0
+  track[i].start_point = 0 + softcut_offsets[i]
+  track[i].end_point = 60 + softcut_offsets[i]
+  track[i].poll_position = 0 + softcut_offsets[i]
   track[i].pos_grid = -1
   track[i].rec_limit = 0
   track[i].snapshot = {["partial_restore"] = false}
@@ -92,7 +94,7 @@ function init()
   softcut.buffer(1,1)
   softcut.buffer(2,2)
   
-  for i = 1, TRACKS do
+  for i = 1, 4 do
     softcut.level(i,1.0)
     softcut.play(i, 1)
     softcut.rate(i, 1*offset)
@@ -118,6 +120,9 @@ function init()
   KEY3_hold = false
   KEY1_hold = false
   KEY1_press = 0
+
+  voice_on_screen = 1
+
   clear_all()
 
   hardware_redraw = metro.init(
@@ -134,6 +139,8 @@ function init()
 
   softcut.pre_filter_dry(1,1)
   softcut.pre_filter_dry(2,1)
+  softcut.pre_filter_dry(3,1)
+  softcut.pre_filter_dry(4,1)
 end
 
 function grid.add()
@@ -168,47 +175,47 @@ phase = function(n, x)
 end
 
 function warble()
-  local bufSpeed1 = speedlist[1][params:get("speed_voice_1")]
-  if bufSpeed1 > 1.99 then
-      ray = bufSpeed1 + (math.random(-15,15)/1000)
-    elseif bufSpeed1 >= 1.0 then
-      ray = bufSpeed1 + (math.random(-10,10)/1000)
-    elseif bufSpeed1 >= 0.50 then
-      ray = bufSpeed1 + (math.random(-4,5)/1000)
+  local bufSpeed = speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)]
+  if bufSpeed > 1.99 then
+      ray = bufSpeed + (math.random(-15,15)/1000)
+    elseif bufSpeed >= 1.0 then
+      ray = bufSpeed + (math.random(-10,10)/1000)
+    elseif bufSpeed >= 0.50 then
+      ray = bufSpeed + (math.random(-4,5)/1000)
     else
-      ray = bufSpeed1 + (math.random(-2,2)/1000)
+      ray = bufSpeed + (math.random(-2,2)/1000)
   end
-    softcut.rate_slew_time(1,0.6 + (math.random(-30,10)/100))
+  softcut.rate_slew_time(voice_on_screen,0.6 + (math.random(-30,10)/100))
 end
 
 function half_speed()
-  ray = speedlist[1][params:get("speed_voice_1")] / 2
-  softcut.rate_slew_time(1,0.6 + (math.random(-30,10)/100))
+  ray = speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)] / 2
+  softcut.rate_slew_time(voice_on_screen,0.6 + (math.random(-30,10)/100))
 end
 
 function rev_speed()
-  ray = speedlist[1][params:get("speed_voice_1")] * -1
-  softcut.rate_slew_time(1,0.01)
+  ray = speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)] * -1
+  softcut.rate_slew_time(voice_on_screen,0.01)
 end
 
 function oneandahalf_speed()
-  ray = speedlist[1][params:get("speed_voice_1")] * 1.5
-  softcut.rate_slew_time(1,0.6 + (math.random(-30,10)/100))
+  ray = speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)] * 1.5
+  softcut.rate_slew_time(voice_on_screen,0.6 + (math.random(-30,10)/100))
 end
 
 function double_speed()
-  ray = speedlist[1][params:get("speed_voice_1")] * 2
-  softcut.rate_slew_time(1,0.6 + (math.random(-30,10)/100))
+  ray = speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)] * 2
+  softcut.rate_slew_time(voice_on_screen,0.6 + (math.random(-30,10)/100))
 end
 
 function restore_speed()
-  ray = speedlist[1][params:get("speed_voice_1")]
+  ray = speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)]
   if params:get("KEY3") == 2 then
-    softcut.rate_slew_time(1,0.01)
+    softcut.rate_slew_time(voice_on_screen,0.01)
   else
-    softcut.rate_slew_time(1,0.6)
+    softcut.rate_slew_time(voice_on_screen,0.6)
   end
-  softcut.rate(1,speedlist[1][params:get("speed_voice_1")]*offset)
+  softcut.rate(voice_on_screen,speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)]*offset)
 end
 
 function clear_all()
@@ -381,13 +388,11 @@ down_time = 0
 hold_time = 0
 speedlist = {
   {-4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4},
+  {-4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4},
+  {-4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4},
   {-4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4}
 }
-track[1].start_point = 0
-track[2].start_point = 0
-track[1].end_point = 60
-track[2].end_point = 60
-over = {0,0}
+over = {0,0,0,0}
 clear = 1
 ray = 0.0
 KEY3 = 1
@@ -423,7 +428,7 @@ function key(n,z)
       KEY3_hold = false
       restore_speed()
     end
-    softcut.rate(1,ray*offset)
+    softcut.rate(voice_on_screen,ray*offset)
   end
 
   -- KEY 1
@@ -456,54 +461,88 @@ end
 
 -- encoder hardware interaction
 function enc(n,d)
-  local _t = KEY1_press % 2 == 0 and 1 or 2
+  -- local _t = KEY1_press % 2 == 0 and 1 or 2
+  local _t = voice_on_screen
   -- encoder 3: voice 1's loop end point
   if n == 3 then
-    track[_t].end_point = util.clamp((track[_t].end_point + d/10),0.0,60.0)
+    if (math.abs(d) == 1) then
+      d = d > 0 and 1/100 or -1/100
+    else
+      d = d > 0 and 1/10 or -1/10
+    end
+    track[_t].end_point = util.clamp((track[_t].end_point + d), 0 + softcut_offsets[_t], 60 + softcut_offsets[_t])
     softcut.loop_end(_t,track[_t].end_point)
-    screen_dirty = true
 
   -- encoder 2: voice 1's loop start point
   elseif n == 2 then
-    track[_t].start_point = util.clamp((track[_t].start_point + d/10),0.0,60.0)
+    if (math.abs(d) == 1) then
+      d = d > 0 and 1/100 or -1/100
+    else
+      d = d > 0 and 1/10 or -1/10
+    end
+    track[_t].start_point = util.clamp((track[_t].start_point + d), 0  + softcut_offsets[_t], 60  + softcut_offsets[_t])
     softcut.loop_start(_t,track[_t].start_point)
-    screen_dirty = true
 
   -- encoder 1: voice 1's overwrite/overdub amount
   -- 0 is full overdub
   -- 1 is full overwrite
   elseif n == 1 then
-    over[_t] = util.clamp((over[_t] + d/100), 0.0,1.0)
-    if rec % 2 == 1 then
-      softcut.pre_level(_t,math.abs(over[_t]-1))
+    if KEY1_hold then
+      voice_on_screen = util.clamp(voice_on_screen + d, 1, 4)
+    else
+      if _t < 3 then
+        over[_t] = util.clamp((over[_t] + d/100), 0.0,1.0)
+        if rec % 2 == 1 then
+          softcut.pre_level(_t,math.abs(over[_t]-1))
+        end
+      end
     end
-    screen_dirty = true
+    -- over[_t] = util.clamp((over[_t] + d/100), 0.0,1.0)
+    -- if rec % 2 == 1 then
+    --   softcut.pre_level(_t,math.abs(over[_t]-1))
+    -- end
   end
+  screen_dirty = true
 end
 
 -- displaying stuff on the screen
 function redraw()
   screen.clear()
-  screen.level(15)
-  screen.move(0,50)
-  local _t = KEY1_press % 2 == 0 and 1 or 2
-  screen.text("s".._t..": "..util.round(track[_t].start_point,0.01))
-  screen.move(0,60)
-  screen.text("e".._t..": "..util.round(track[_t].end_point,0.01))
-  screen.move(0,40)
-  screen.text("o".._t..": "..over[_t])
-  if crane_redraw == 1 then
-    if crane2_redraw == 0 then
-      crane()
+  if KEY1_hold then
+    screen.font_size(22)
+    for i = 1,4 do
+      screen.move(10 + (20*i),40)
+      screen.level(voice_on_screen == i and 15 or 4)
+      screen.text_center(i)
+    end
+  else
+    screen.font_size(8)
+    screen.level(15)
+    screen.move(0,50)
+    -- local _t = KEY1_press % 2 == 0 and 1 or 2
+    local _t = voice_on_screen
+    screen.text("s".._t..": "..util.round(track[_t].start_point - softcut_offsets[_t],0.01))
+    screen.move(0,60)
+    screen.text("e".._t..": "..util.round(track[_t].end_point - softcut_offsets[_t],0.01))
+    screen.move(0,40)
+    screen.text("o".._t..": "..over[_t])
+    if crane_redraw == 1 then
+      if crane2_redraw == 0 then
+        crane()
+      else
+        crane2()
+      end
+    end
+    screen.level(3)
+    screen.move(0,10)
+    if voice_on_screen == 1 or voice_on_screen == 2 then
+      screen.text("one: "..util.round(track[1].poll_position,0.1))
+      screen.move(0,20)
+      screen.text("two: "..util.round(track[2].poll_position,0.1))
     else
-      crane2()
+      screen.text((_t == 3 and "three: " or "four: ")..util.round(track[_t].poll_position - softcut_offsets[_t],0.1))
     end
   end
-  screen.level(3)
-  screen.move(0,10)
-  screen.text("one: "..util.round(track[1].poll_position,0.1))
-  screen.move(0,20)
-  screen.text("two: "..util.round(track[2].poll_position,0.1))
   screen.update()
   end
 

@@ -2,7 +2,7 @@ local ca = {}
 
 function ca.init()
   clip = {}
-  for i = 1,TRACKS do
+  for i = 1,4 do
     clip[i] = {}
     clip[i].length = 90
     clip[i].sample_length = 60
@@ -42,42 +42,26 @@ function ca.load_sample(file,sample,summed)
     clip[sample].original_length = len/48000
     clip[sample].original_bpm = chitter.derive_bpm(clip[sample])
     clip[sample].original_samplerate = rate/1000
-    if summed == "summed" then
-      softcut.buffer_clear_region_channel(sample,0,clip[sample].sample_length)
-      if ch == 2 then
-        for i = 1,2 do
-          if i == 1 then
-            softcut.buffer_read_mono(file, 0, 0, clip[sample].sample_length + 0.05, i, sample, 0, 0.5)
-          else
-            softcut.buffer_read_mono(file, 0, 0,clip[sample].sample_length + 0.05, i, sample, 1, 0.5)
-          end
-        end
-      else
-        softcut.buffer_read_mono(file, 0, 0,clip[sample].sample_length + 0.05, i, sample)
-      end
-    else
-      local im_ch = ch == 2 and clip[sample].channel-1 or 1
-      softcut.buffer_clear_region_channel(sample,0,60)
-      softcut.buffer_read_mono(file, 0, 0,clip[sample].sample_length + 0.05, im_ch, sample)
-    end
-    track[sample].end_point = clip[sample].sample_length
+    local im_ch = ch == 2 and clip[sample].channel-1 or 1
+    local scaled = {
+      -- {buffer, start, end}
+      {1,0,clip[sample].sample_length + 0.05},
+      {params:get("voice_2_buffer"),0,clip[sample].sample_length + 0.05},
+      {1,softcut_offsets[3],clip[sample].sample_length + 0.05 + softcut_offsets[3]},
+      {2,softcut_offsets[4],clip[sample].sample_length + 0.05 + softcut_offsets[4]},
+    }
+    softcut.buffer_clear_region_channel(scaled[sample][1],scaled[sample][2],60)
+    softcut.buffer_read_mono(file, 0, scaled[sample][2], clip[sample].sample_length + 0.05, im_ch, scaled[sample][1])
+    track[sample].end_point = clip[sample].sample_length + softcut_offsets[sample]
     softcut.enable(sample, 1)
     softcut.play(sample, 1)
-    -- softcut.rec(sample, 0)
     softcut.rec_level(sample,0)
     softcut.level(sample, 1)
+    softcut.loop_start(sample,track[sample].start_point)
     softcut.loop_end(sample,track[sample].end_point)
     softcut.position(sample,track[sample].start_point)
     chitter_stretch[sample].pos = track[sample].start_point
     clear = 0
-    -- ca.clip_table()
-    -- for p = 1,16 do
-    --   for b = 1,3 do
-    --     if bank[b][p].mode == 2 and bank[b][p].clip == sample and pre_ccy_sample[b] == false then
-    --       ca.scale_loop_points(bank[b][p], old_min, old_max, clip[sample].min, clip[sample].max)
-    --     end
-    --   end
-    -- end
   end
   if params:get("clip "..sample.." sample") ~= file then
     params:set("clip "..sample.." sample", file, 1)

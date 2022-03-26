@@ -3,16 +3,16 @@ local _params = {}
 function _params.init()
 
   params:add_separator("cranes")
-  params:add_group("clips",2)
+  params:add_group("clips",4)
   
-  for i = 1,TRACKS do
+  for i = 1,4 do
     params:add_file("clip "..i.." sample", "sample ["..i.."]")
     params:set_action("clip "..i.." sample", function(file) _ca.load_sample(file,i) end)
   end
 
-  params:add_group("rates",3)
+  params:add_group("rates",5)
   
-  for i = 1,TRACKS do
+  for i = 1,4 do
     params:add_option("speed_voice_"..i,"speed voice "..i, speedlist[1])
     params:set("speed_voice_"..i, 9)
     params:set_action("speed_voice_"..i,
@@ -29,6 +29,8 @@ function _params.init()
       offset = math.pow(0.5, -value / 12)
       softcut.rate(1,speedlist[1][params:get("speed_voice_1")]*offset)
       softcut.rate(2,speedlist[2][params:get("speed_voice_2")]*offset)
+      softcut.rate(3,speedlist[3][params:get("speed_voice_3")]*offset)
+      softcut.rate(4,speedlist[4][params:get("speed_voice_4")]*offset)
     end
   )
   params:add_group("levels",8)
