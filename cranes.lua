@@ -30,6 +30,13 @@
 -- \\\\
 
 _params = include 'lib/params'
+snapshot = include 'lib/snapshot'
+chitter = include 'lib/chitter'
+_ca = include 'lib/clip'
+
+DATA_DIR = _path.data.."cranes/"
+AUDIO_DIR = _path.audio.."cranes/"
+TRACKS = 2
 
 function r()
   norns.script.load(norns.state.script)
@@ -45,20 +52,19 @@ end
 rec = 0
 offset = 1
 
-presets = {
+snapshots = {
   [1] = {},
   [2] = {}
 }
-for i = 1,2 do
+for i = 1,TRACKS do
   for j = 1,12 do
-    presets[i][j] = {}
+    snapshots[i][j] = {}
   end
 end
--- presets[voice][coll].start_point = track[voice].start_point
-preset_count = {0,0}
-selected_preset = {0,0}
+-- snapshots[voice][coll].start_point = track[voice].start_point
+snapshot_count = {0,0}
+selected_snapshot = {0,0}
 
-TRACKS = 2
 track = {}
 for i=1,TRACKS do
   track[i] = {}
@@ -66,6 +72,7 @@ for i=1,TRACKS do
   track[i].end_point = 60
   track[i].poll_position = 0
   track[i].pos_grid = -1
+  track[i].snapshot = {["partial_restore"] = false}
 end
 
 distance = {0,0}
@@ -91,7 +98,7 @@ function init()
     softcut.loop_start(i, 0)
     softcut.loop_end(i, 60)
     softcut.loop(i, 1)
-    softcut.fade_time(i, 0.1)
+    softcut.fade_time(i, 0.01)
     softcut.rec(i, 1)
     softcut.rec_level(i, 1)
     softcut.pre_level(i, 1)
@@ -101,7 +108,7 @@ function init()
   end
  
   softcut.event_phase(phase)
-
+  _ca.init()
   _params.init()
   
   counter = metro.init(count, 0.005, -1)
@@ -123,6 +130,13 @@ function init()
   screen_dirty = true
   
   softcut.poll_start_phase()
+
+  softcut.pre_filter_dry(1,1)
+  softcut.pre_filter_dry(2,1)
+end
+
+function grid.add()
+  grid_dirty = true
 end
 
 function draw_hardware()
@@ -137,6 +151,7 @@ function draw_hardware()
 end
 
 phase = function(n, x)
+  -- print("happening")
   track[n].poll_position = x
   pp = ((x - track[n].start_point) / (track[n].end_point - track[n].start_point))
   x = math.floor(pp * 16)
@@ -145,24 +160,6 @@ phase = function(n, x)
   end
   grid_dirty = true
   screen_dirty = true
-end
-
-function preset_pack(voice,coll)
-  presets[voice][coll].start_point = track[voice].start_point
-  presets[voice][coll].end_point = track[voice].end_point
-  presets[voice][coll].poll_position = track[voice].poll_position
-  presets[voice][coll].rate = params:get("speed_voice_"..voice)
-end
-
-function preset_unpack(voice, coll)
-  track[voice].start_point = presets[voice][coll].start_point
-  softcut.loop_start(voice,track[voice].start_point)
-  track[voice].end_point = presets[voice][coll].end_point
-  softcut.loop_end(voice,track[voice].end_point)
-  softcut.position(voice,presets[voice][coll].poll_position)
-  params:set("speed_voice_1", presets[voice][coll].rate)
-  screen_dirty = true
-  grid_dirty = true
 end
 
 function warble()
@@ -214,6 +211,7 @@ function clear_all()
     softcut.rec_level(i, 1)
     softcut.level(i, 0)
     softcut.play(i, 0)
+    softcut.position(i, 0)
     softcut.rate(i, 1*offset)
     softcut.loop_start(i, 0)
     softcut.loop_end(i, 60)
@@ -454,13 +452,13 @@ end
 function enc(n,d)
   local _t = KEY1_press % 2 == 0 and 1 or 2
   -- encoder 3: voice 1's loop end point
-  if n == 3 and KEY1_press % 2 == 0 then
+  if n == 3 then
     track[_t].end_point = util.clamp((track[_t].end_point + d/10),0.0,60.0)
     softcut.loop_end(_t,track[_t].end_point)
     screen_dirty = true
 
   -- encoder 2: voice 1's loop start point
-  elseif n == 2 and KEY1_press % 2 == 0 then
+  elseif n == 2 then
     track[_t].start_point = util.clamp((track[_t].start_point + d/10),0.0,60.0)
     softcut.loop_start(_t,track[_t].start_point)
     screen_dirty = true
@@ -483,9 +481,9 @@ function redraw()
   screen.level(15)
   screen.move(0,50)
   local _t = KEY1_press % 2 == 0 and 1 or 2
-  screen.text("s".._t..": "..math.ceil(track[_t].start_point * (10^2))/(10^2))
+  screen.text("s".._t..": "..util.round(track[_t].start_point,0.01))
   screen.move(0,60)
-  screen.text("e".._t..": "..math.ceil(track[_t].end_point * (10^2))/(10^2))
+  screen.text("e".._t..": "..util.round(track[_t].end_point,0.01))
   screen.move(0,40)
   screen.text("o".._t..": "..over[_t])
   if crane_redraw == 1 then
@@ -497,9 +495,9 @@ function redraw()
   end
   screen.level(3)
   screen.move(0,10)
-  screen.text("one: "..math.floor(track[1].poll_position*10)/10)
+  screen.text("one: "..util.round(track[1].poll_position,0.1))
   screen.move(0,20)
-  screen.text("two: "..math.floor(track[2].poll_position*10)/10)
+  screen.text("two: "..util.round(track[2].poll_position,0.1))
   screen.update()
   end
 
@@ -570,50 +568,44 @@ g = grid.connect()
 -- hardware: grid event (eg 'what happens when a button is pressed')
 g.key = function(x,y,z)
 -- speed + direction
-  if y == 1 and z == 1 then
-    if x <= #speedlist[1] then
-      params:set("speed_voice_1",x)
+  if (y == 1 or y == 5) and z == 1 then
+    local _t = y == 1 and 1 or 2
+    if x <= #speedlist[_t] then
+      params:set("speed_voice_".._t,x)
     elseif x == 13 then
-      softcut.position(1,track[2].poll_position)
+      local other_track = _t == 1 and 2 or 1
+      softcut.position(_t,track[other_track].poll_position)
     elseif x == 14 then
-      track[1].start_point = track[2].start_point
-      softcut.loop_start(1,track[1].start_point)
-      track[1].end_point = track[2].end_point
-      softcut.loop_end(1,track[1].end_point)
+      local other_track = _t == 1 and 2 or 1
+      track[_t].start_point = track[other_track].start_point
+      softcut.loop_start(_t,track[_t].start_point)
+      track[_t].end_point = track[other_track].end_point
+      softcut.loop_end(_t,track[_t].end_point)
     elseif x == 15 then
-      softcut.position(1,track[1].start_point)
+      softcut.position(_t,track[_t].start_point)
     end
     grid_dirty = true
-  elseif y == 5 and z == 1 then
-    if x <=#speedlist[2] then
-      params:set("speed_voice_2",x)
-    elseif x == 13 then
-      softcut.position(2,track[1].poll_position)
-    elseif x == 14 then
-      track[2].start_point = track[1].start_point
-      softcut.loop_start(2,track[2].start_point)
-      track[2].end_point = track[1].end_point
-      softcut.loop_end(2,track[2].end_point)
-    elseif x == 15 then
-      softcut.position(2,track[2].start_point)
-    end
-    grid_dirty = true
--- presets
-  elseif (y == 2 or y == 6) and z == 1 then
+-- snapshots
+  elseif (y == 2 or y == 6) then
     local _t = y == 2 and 1 or 2
-    if x < 14 and x < preset_count[_t]+1 then
-      preset_unpack(_t, x)
-      selected_preset[_t] = x
-    elseif x == 15 then
-      for i = 1,12 do
-        presets[_t][i] = {}
+    if z == 1 then
+      if x <= 8 then
+        if tab.count(snapshots[_t][x]) == 0 then
+          track[_t].snapshot.saver_clock = clock.run(snapshot.save_to_slot,_t,x)
+          -- track[_t].snapshot_mod_index = i
+        else
+          -- local modifier, style = 0,"beats"
+          -- if track[_t].restore_mod then
+          --   modifier =  track[_t].snapshot[i].restore_times[track[_t].snapshot[i].restore_times.mode][track[_t].restore_mod_index]
+          --   style = track[_t].snapshot[i].restore_times.mode
+          -- end
+          snapshot.unpack(_t,x)
+          -- track[_t].snapshot_mod_index = i
+        end
       end
-      preset_count[_t] = 0
-      selected_preset[_t] = 0
-    elseif x == 16 then
-      if preset_count[_t] < 13 then
-        preset_count[_t] = preset_count[_t] + 1
-        preset_pack(_t, preset_count[_t])
+    else
+      if track[_t].snapshot.saver_clock ~= nil then
+        clock.cancel(track[_t].snapshot.saver_clock)
       end
     end
     grid_dirty = true
@@ -624,17 +616,22 @@ g.key = function(x,y,z)
     local _t = y == 4 and 1 or 2
     local _block = (track[_t].end_point - track[_t].start_point) / 16
     local _cutposition = _block * (x-1)
-    softcut.position(_t,_cutposition)
+    if params:string("chittering_mode_".._t) ~= "off" then
+      chitter_stretch[_t].pos = _cutposition
+    else
+      softcut.position(_t,_cutposition)
+    end
   end
 end
 
 -- hardware: grid redraw
 function grid_redraw()
   g:all(0)
-  for i=1,preset_count[1] do
-    g:led(i,2,5)
+  for i = 1,8 do
+    g:led(i,2,tab.count(snapshots[1][i]) > 0 and 5 or 0)
+    g:led(i,6,tab.count(snapshots[2][i]) > 0 and 5 or 0)
   end
-  for i=1, preset_count[2] do
+  for i=1, snapshot_count[2] do
     g:led(i,6,5)
   end
   g:led(15,2,3)
@@ -707,7 +704,7 @@ function grid_redraw()
   g:led(3,7,9)
   g:led(2,7,9)
   g:led(1,7,5)
-  g:led(selected_preset[1],2,12)
-  g:led(selected_preset[2],6,12)
+  g:led(selected_snapshot[1],2,12)
+  g:led(selected_snapshot[2],6,12)
   g:refresh()
 end
