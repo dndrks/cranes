@@ -25,7 +25,6 @@ function ca.sample_callback(path,i,summed)
 end
 
 function ca.load_sample(file,sample,summed)
-  print(sample)
   local old_min = clip[sample].min
   local old_max = clip[sample].max
   if file ~= "-" then

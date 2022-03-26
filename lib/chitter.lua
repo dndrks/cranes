@@ -17,7 +17,7 @@ end
 
 function chitter.init_params()
   chitter.init()
-  params:add_separator("flight")
+  params:add_group("flight",8)
   local bank_names = {"[a]","[b]","[c]"}
   for i = 1,TRACKS do
     params:add_option("chittering_mode_"..i,"flight mode "..bank_names[i],{"off","woodcock","dove","starling"},1)
@@ -42,7 +42,6 @@ function chitter.init_params()
         local p_t =
         {
           {"chittering_step_",100},
-          -- {"chittering_duration_",12},
           {"chittering_fade_",6}
         }
         for j = 1,#p_t do
@@ -85,15 +84,16 @@ function chitter.init_params()
         end
       end
     end)
-    params:add_number("chittering_step_"..i,"    step time",1,300,12)
+
+    params:add_number("chittering_step_"..i,"    step time",1,300,12, function(param) return ("1/"..param:get()) end)
     params:set_action("chittering_step_"..i, function(x)
       chitter_stretch[i].inc = x
     end)
-    params:add_number("chittering_duration_"..i,"    duration",1,300,12)
+    params:add_number("chittering_duration_"..i,"    duration",1,300,12, function(param) return ("1/"..param:get()) end)
     params:set_action("chittering_duration_"..i, function(x)
       chitter_stretch[i].time = x
     end)
-    params:add_number("chittering_fade_"..i,"    fade",0,300,1)
+    params:add_number("chittering_fade_"..i,"    fade",0,300,1, function(param) return ((param:get()/100).."s") end)
     params:set_action("chittering_fade_"..i, function(x)
       chitter_stretch[i].fade_time = x
       softcut.fade_time(i,x/100)

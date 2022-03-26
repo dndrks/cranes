@@ -72,6 +72,7 @@ for i=1,TRACKS do
   track[i].end_point = 60
   track[i].poll_position = 0
   track[i].pos_grid = -1
+  track[i].rec_limit = 0
   track[i].snapshot = {["partial_restore"] = false}
 end
 
@@ -151,8 +152,12 @@ function draw_hardware()
 end
 
 phase = function(n, x)
-  -- print("happening")
   track[n].poll_position = x
+  if rec%2 == 1 then
+    if x > track[n].rec_limit then
+      track[n].rec_limit = x
+    end
+  end
   pp = ((x - track[n].start_point) / (track[n].end_point - track[n].start_point))
   x = math.floor(pp * 16)
   if x ~= track[n].pos_grid then
@@ -217,6 +222,7 @@ function clear_all()
     softcut.loop_end(i, 60)
     softcut.position(i, 0)
     softcut.enable(i, 0)
+    track[i].rec_limit = 0
   end
   softcut.buffer_clear()
   ray = speedlist[1][params:get("speed_voice_1")]
@@ -374,8 +380,8 @@ end
 down_time = 0
 hold_time = 0
 speedlist = {
-  {-4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0},
-  {-4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0}
+  {-4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4},
+  {-4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4}
 }
 track[1].start_point = 0
 track[2].start_point = 0
