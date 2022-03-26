@@ -113,7 +113,7 @@ function chitter.stretch(i)
   while true do
     clock.sleep((1/chitter_stretch[i].time)*clock.get_beat_sec())
     -- clock.sync(1/chitter_stretch[i].time)
-    if chitter_stretch[i].enabled and clear == 0 then
+    if chitter_stretch[i].enabled and clear[i] == 0 then
       softcut.position(i, chitter_stretch[i].pos)
       if chitter_stretch[i].pos + ((1/chitter_stretch[i].inc)*clock.get_beat_sec()) > (track[i].end_point - (chitter_stretch[i].fade_time/100))then
         chitter_stretch[i].pos = track[i].start_point - ((1/chitter_stretch[i].inc)*clock.get_beat_sec())
