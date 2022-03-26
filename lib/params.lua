@@ -6,7 +6,7 @@ function _params.init()
   params:add_group("clips",2)
   
   for i = 1,TRACKS do
-    params:add_file("clip "..i.." sample", "clip "..i.." sample")
+    params:add_file("clip "..i.." sample", "sample ["..i.."]")
     params:set_action("clip "..i.." sample", function(file) _ca.load_sample(file,i) end)
   end
 

@@ -18,7 +18,7 @@ end
 function chitter.init_params()
   chitter.init()
   params:add_group("flight",8)
-  local bank_names = {"[a]","[b]","[c]"}
+  local bank_names = {"[1]","[2]","[c]"}
   for i = 1,TRACKS do
     params:add_option("chittering_mode_"..i,"flight mode "..bank_names[i],{"off","woodcock","dove","starling"},1)
     params:set_action("chittering_mode_"..i,function(x)
@@ -30,12 +30,20 @@ function chitter.init_params()
           softcut.fade_time(i,0.01)
           track[i].chitter_stretch = false
         end
+        params:hide("chittering_step_"..i)
+        params:hide("chittering_duration_"..i)
+        params:hide("chittering_fade_"..i)
+        _menu.rebuild_params()
       elseif x > 1 then
         if chitter_stretch[i].clock == nil then
           chitter_stretch[i].clock = clock.run(chitter.stretch,i)
           chitter_stretch[i].enabled = true
           track[i].chitter_stretch = true
         end
+        params:show("chittering_step_"..i)
+        params:show("chittering_duration_"..i)
+        params:show("chittering_fade_"..i)
+        _menu.rebuild_params()
       end
       if x == 2 then
         chitter_stretch[i].pos = track[i].poll_position
