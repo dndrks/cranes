@@ -45,14 +45,17 @@ end
 -- counting ms between key 2 taps
 -- sets loop length
 function count()
-  rec_time[1] = rec_time[1] + 0.005
-  rec_time[2] = rec_time[2] + 0.005
+  for i = 1,4 do
+    if rec[i] == 1 then
+      rec_time[i] = rec_time[i] + 0.005
+    end
+  end
 end
 
 -- track recording state
 rec = {0,0,0,0}
 clear = {1,1,1,1}
-offset = 1
+offset = {1,1,1,1}
 
 snapshots = {
   [1] = {},
@@ -99,15 +102,15 @@ function init()
   for i = 1, 4 do
     softcut.level(i,1.0)
     softcut.play(i, 1)
-    softcut.rate(i, 1*offset)
-    softcut.loop_start(i, 0)
-    softcut.loop_end(i, 60)
+    softcut.rate(i, 1*offset[i])
+    softcut.loop_start(i, softcut_offsets[i])
+    softcut.loop_end(i, 60+softcut_offsets[i])
     softcut.loop(i, 1)
     softcut.fade_time(i, 0.01)
     softcut.rec(i, 1)
     softcut.rec_level(i, 1)
     softcut.pre_level(i, 1)
-    softcut.position(i, 0)
+    softcut.position(i, softcut_offsets[i])
     softcut.phase_quant(i, 0.01)
     softcut.rec_offset(i, -0.0003)
   end
@@ -125,7 +128,9 @@ function init()
 
   voice_on_screen = 1
 
-  clear_all()
+  for i = 1,4 do
+    clear_track(i)
+  end
 
   hardware_redraw = metro.init(
     function()
@@ -162,9 +167,13 @@ end
 
 phase = function(n, x)
   track[n].poll_position = x
-  if rec[n] == 1 then
+  if rec[n] == 1 and clear[n] == 1 then
     if x > track[n].rec_limit then
       track[n].rec_limit = x
+    end
+  elseif rec[n] == 1 and clear[n] == 0 then
+    if (x > track[n].rec_limit) and (track[n].end_point > track[n].rec_limit) then
+      track[n].rec_limit = track[n].end_point
     end
   end
   pp = ((x - track[n].start_point) / (track[n].end_point - track[n].start_point))
@@ -217,44 +226,51 @@ function restore_speed()
   else
     softcut.rate_slew_time(voice_on_screen,0.6)
   end
-  softcut.rate(voice_on_screen,speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)]*offset)
+  softcut.rate(voice_on_screen,speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)]*offset[voice_on_screen])
 end
 
-function clear_all()
-  for i = 1, TRACKS do
-    softcut.rec_level(i, 1)
-    softcut.level(i, 0)
-    softcut.play(i, 0)
-    softcut.position(i, 0)
-    softcut.rate(i, 1*offset)
-    softcut.loop_start(i, 0)
-    softcut.loop_end(i, 60)
-    softcut.position(i, 0)
-    softcut.enable(i, 0)
-    track[i].rec_limit = 0
-  end
-  softcut.buffer_clear()
-  ray = speedlist[1][params:get("speed_voice_1")]
-  track[1].start_point = 0
-  track[2].start_point = 0
-  track[1].end_point = 60
-  track[2].end_point = 60
-  clear = {1,1,1,1}
-  rec_time = {0,0,0,0}
-  rec[1] = 0
-  rec[2] = 0
-  crane_redraw = 0
-  crane2_redraw = 0
-  c2 = math.random(4,15)
+function clear_track(_t)
+  local scaled = {
+    -- {buffer, start, end}
+    {1,0,60},
+    {params:get("voice_2_buffer"),0,60},
+    {1,softcut_offsets[3],60 + softcut_offsets[3]},
+    {2,softcut_offsets[4],60 + softcut_offsets[4]},
+  }
+  softcut.rec_level(_t, 1)
+  softcut.level(_t, 0)
+  softcut.play(_t, 0)
+  softcut.position(_t, scaled[_t][2])
+  softcut.rate(_t, 1*offset[_t])
+  softcut.loop_start(_t, scaled[_t][2])
+  softcut.loop_end(_t, scaled[_t][3])
+  softcut.position(_t, scaled[_t][2])
+  softcut.enable(_t, 0)
+  track[_t].rec_limit = 0
+  softcut.buffer_clear_region_channel(scaled[_t][1],scaled[_t][2],60)
+
+  ray = speedlist[1][params:get("speed_voice_1")] -- TODO FIX
+  
+  track[_t].start_point = scaled[_t][2]
+  track[_t].end_point = scaled[_t][3]
+
+  clear[_t] = 1
+  rec_time[_t] = 0
+  rec[_t] = 0
+  recording_crane[_t] = 0
+  overdub_crane[_t] = 0
+
+  c2 = math.random(4,15) -- TODO FIX
   restore_speed()
-  for i = 1,16 do
-    g:led(i,4,0)
-    g:led(i,8,0)
-  end
+  -- TODO FIX:
+  -- for i = 1,16 do
+  --   g:led(i,4,0)
+  --   g:led(i,8,0)
+  -- end
   g:refresh()
   screen_dirty = true
   KEY3_hold = false
-  params:set("offset",0)
+  params:set("offset_".._t,0) -- TODO VERIFY IF NEEDED...
 end
 
 function window(voice,x)
@@ -314,19 +330,28 @@ function window(voice,x)
   screen_dirty = true
 end
 
-function record(_t)
-  rec[_t] = rec[_t] == 0 and 1 or 0
+function record(_t,silent)
+  if not silent then
+    rec[_t] = rec[_t] == 0 and 1 or 0
+  end
   -- if the buffer is clear and key 2 is pressed:
   -- main recording will enable
   if rec[_t] == 1 and clear[_t] == 1 then
-    softcut.buffer_clear()
+    local scaled = {
+      -- {buffer, start, end}
+      {1,0},
+      {params:get("voice_2_buffer"),0},
+      {1,softcut_offsets[3]},
+      {2,softcut_offsets[4]}
+    }
+    softcut.buffer_clear_region_channel(scaled[_t][1],scaled[_t][2],60)
     softcut.rate_slew_time(_t,0.01)
     softcut.enable(_t, 1)
-    softcut.rate(_t, 1*offset)
+    softcut.rate(_t, 1*offset[_t])
     softcut.play(_t, 1)
     softcut.rec(_t, 1)
     softcut.level(_t, 0)
-    crane_redraw = 1
+    recording_crane[_t] = 1
     screen_dirty = true
     counter:start()
   -- if the buffer is clear and key 2 is pressed again:
@@ -335,31 +360,21 @@ function record(_t)
     clear[_t] = 0
     softcut.position(_t,track[_t].start_point)
     softcut.rec_level(_t,0)
-    -- softcut.position(1,0)
-    -- softcut.position(2,0)
-    -- softcut.rec_level(1,0)
-    -- softcut.rec_level(2,0)
     counter:stop()
     softcut.poll_start_phase()
-    track[_t].end_point = rec_time[_t]
+    track[_t].end_point = softcut_offsets[_t] + rec_time[_t]
     print(_t,track[_t].end_point)
-    -- track[1].end_point = rec_time
-    -- track[2].end_point = rec_time
     softcut.loop_end(_t,track[_t].end_point)
-    -- softcut.loop_end(1,track[1].end_point)
-    -- softcut.loop_end(2,track[2].end_point)
     softcut.loop_start(_t,track[_t].start_point)
-    -- softcut.loop_start(2,0)
     -- track[2].start_point = 0
-    crane_redraw = 0
+    recording_crane[_t] = 0
     screen_dirty = true
     rec_time[_t] = 0
     softcut.level(_t,params:get("vol_".._t))
-    -- softcut.level(1,1)
-    -- softcut.level(2,1)
-    softcut.rate(_t,speedlist[_t][params:get("speed_voice_".._t)]*offset)
-    -- softcut.rate(1,speedlist[1][params:get("speed_voice_1")]*offset)
-    -- softcut.rate(2,speedlist[2][params:get("speed_voice_2")]*offset)
+    softcut.rate(_t,speedlist[_t][params:get("speed_voice_".._t)]*offset[_t])
+    if track[_t].end_point > track[_t].rec_limit then
+      track[_t].rec_limit = track[_t].end_point
+    end
   end
   -- if the buffer is NOT clear and key 2 is pressed:
   -- overwrite/overdub behavior will enable
@@ -377,14 +392,17 @@ function toggle_overdub(_t,state)
     rec[_t] = 1
     softcut.rec_level(_t,1)
     softcut.pre_level(_t,math.abs(over[_t]-1))
-    crane_redraw = 1
-    crane2_redraw = 1
+    recording_crane[_t] = 1
+    overdub_crane[_t] = 1
+    -- if track[_t].end_point > track[_t].rec_limit then
+    --   track[_t].rec_limit = track[_t].end_point
+    -- end
   else
     rec[_t] = 0
     softcut.rec_level(_t,0)
     softcut.pre_level(_t,1)
-    crane_redraw = 0
-    crane2_redraw = 0
+    recording_crane[_t] = 0
+    overdub_crane[_t] = 0
   end
   screen_dirty = true
 end
@@ -401,8 +419,8 @@ speedlist = {
 over = {0,0,0,0}
 ray = 0.0
 KEY3 = 1
-crane_redraw = 0
-crane2_redraw = 0
+recording_crane = {0,0,0,0}
+overdub_crane = {0,0,0,0}
 c2 = math.random(4,12)
 
 -- key hardware interaction
@@ -411,8 +429,14 @@ function key(n,z)
   -- KEY 2
   if n == 2 and z == 1 then
     if voice_on_screen == 1 or voice_on_screen == 2 then
-      record(1)
-      record(2)
+      if voice_on_screen == 1 and clear[1] == 0 then
+        record(1)
+      elseif voice_on_screen == 2 and clear[2] == 0 then
+        record(2)
+      elseif (voice_on_screen == 1 or voice_on_screen == 2) and (clear[1] == 1 and clear[2] == 1) then
+        record(1)
+        record(2)
+      end
     else
       record(voice_on_screen)
     end
@@ -438,29 +462,29 @@ function key(n,z)
       KEY3_hold = false
       restore_speed()
     end
-    softcut.rate(voice_on_screen,ray*offset)
+    softcut.rate(voice_on_screen,ray*offset[voice_on_screen])
   end
 
   -- KEY 1
   -- hold key 1 + key 3 to clear the buffers
   if n == 1 and z == 1 and KEY3_hold == true then
-    clear_all()
+    clear_track(voice_on_screen)
     KEY1_hold = false
   elseif n == 1 and z == 1 then
     KEY1_press = KEY1_press + 1
-    if rec[voice_on_screen] % 2 == 1 then
-      rec[voice_on_screen] = 0
-      if KEY1_press % 2 == 1 then
-        softcut.rec_level(1,0)
-        softcut.pre_level(1,1)
-      elseif KEY1_press % 2 == 0 then
-        softcut.rec_level(2,0)
-        softcut.pre_level(2,1)
-      end
-      crane_redraw = 0
-      crane2_redraw = 0
-      screen_dirty = true
-    end
+    -- if rec[voice_on_screen] % 2 == 1 then
+    --   rec[voice_on_screen] = 0
+    --   if KEY1_press % 2 == 1 then
+    --     softcut.rec_level(1,0)
+    --     softcut.pre_level(1,1)
+    --   elseif KEY1_press % 2 == 0 then
+    --     softcut.rec_level(2,0)
+    --     softcut.pre_level(2,1)
+    --   end
+    --   recording_crane[voice_on_screen] = 0
+    --   overdub_crane[voice_on_screen] = 0
+    --   screen_dirty = true
+    -- end
     KEY1_hold = true
     screen_dirty = true
   elseif n == 1 and z == 0 then
@@ -480,7 +504,7 @@ function enc(n,d)
     else
       d = d > 0 and 1/10 or -1/10
     end
-    track[_t].end_point = util.clamp((track[_t].end_point + d), 0 + softcut_offsets[_t], 60 + softcut_offsets[_t])
+    track[_t].end_point = util.clamp((util.round(track[_t].end_point + d,0.01)), 0 + softcut_offsets[_t], 60 + softcut_offsets[_t])
     softcut.loop_end(_t,track[_t].end_point)
 
   -- encoder 2: voice 1's loop start point
@@ -490,7 +514,7 @@ function enc(n,d)
     else
       d = d > 0 and 1/10 or -1/10
     end
-    track[_t].start_point = util.clamp((track[_t].start_point + d), 0  + softcut_offsets[_t], 60  + softcut_offsets[_t])
+    track[_t].start_point = util.clamp((util.round(track[_t].start_point + d,0.01)), 0  + softcut_offsets[_t], 60  + softcut_offsets[_t])
     softcut.loop_start(_t,track[_t].start_point)
 
   -- encoder 1: voice 1's overwrite/overdub amount
@@ -500,11 +524,9 @@ function enc(n,d)
     if KEY1_hold then
       voice_on_screen = util.clamp(voice_on_screen + d, 1, 4)
     else
-      if _t < 3 then
-        over[_t] = util.clamp((over[_t] + d/100), 0.0,1.0)
-        if rec[voice_on_screen] % 2 == 1 then
-          softcut.pre_level(_t,math.abs(over[_t]-1))
-        end
+      over[_t] = util.clamp((over[_t] + d/100), 0.0,1.0)
+      if rec[voice_on_screen] % 2 == 1 then
+        softcut.pre_level(_t,math.abs(over[_t]-1))
       end
     end
     -- over[_t] = util.clamp((over[_t] + d/100), 0.0,1.0)
@@ -535,7 +557,7 @@ function redraw()
     else
       screen.text_center("3 and 4 are")
       screen.move(64,58)
-      screen.text_center("independent sample players")
+      screen.text_center("independent loopers/samplers")
     end
   else
     screen.font_size(8)
@@ -548,8 +570,8 @@ function redraw()
     screen.text("e".._t..": "..util.round(track[_t].end_point - softcut_offsets[_t],0.01))
     screen.move(0,40)
     screen.text("o".._t..": "..over[_t])
-    if crane_redraw == 1 then
-      if crane2_redraw == 0 then
+    if recording_crane[_t] == 1 then
+      if overdub_crane[_t] == 0 then
         crane()
       else
         crane2()

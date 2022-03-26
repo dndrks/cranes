@@ -62,6 +62,7 @@ function ca.load_sample(file,sample,summed)
     softcut.position(sample,track[sample].start_point)
     chitter_stretch[sample].pos = track[sample].start_point
     clear[sample] = 0
+    track[sample].rec_limit = 0
   end
   if params:get("clip "..sample.." sample") ~= file then
     params:set("clip "..sample.." sample", file, 1)
