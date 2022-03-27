@@ -3,18 +3,28 @@ local snapshot = {}
 function snapshot.pack(voice,coll)
   snapshots[voice][coll].start_point = track[voice].start_point
   snapshots[voice][coll].end_point = track[voice].end_point
-  snapshots[voice][coll].poll_position = track[voice].poll_position
+  -- snapshots[voice][coll].poll_position = track[voice].poll_position
   snapshots[voice][coll].rate = params:get("speed_voice_"..voice)
+  snapshots[voice][coll].level = params:get("vol_"..voice)
   selected_snapshot[voice] = coll
 end
 
 function snapshot.unpack(voice, coll)
+  local change_position = false
+  if track[voice].start_point ~= snapshots[voice][coll].start_point
+  and track[voice].end_point ~= snapshots[voice][coll].end_point then
+    change_position = true
+  end
   track[voice].start_point = snapshots[voice][coll].start_point
   softcut.loop_start(voice,track[voice].start_point)
   track[voice].end_point = snapshots[voice][coll].end_point
   softcut.loop_end(voice,track[voice].end_point)
-  softcut.position(voice,snapshots[voice][coll].poll_position)
+  -- softcut.position(voice,snapshots[voice][coll].poll_position)
+  if change_position then
+    softcut.position(voice,snapshots[voice][coll].start_point)
+  end
   params:set("speed_voice_"..voice, snapshots[voice][coll].rate)
+  params:set("vol_"..voice,snapshots[voice][coll].level)
   screen_dirty = true
   grid_dirty = true
   selected_snapshot[voice] = coll
@@ -66,11 +76,13 @@ function try_it(_t,slot,sec)
   local original_srcs = {}
   original_srcs.start_point = track[_t].start_point
   original_srcs.end_point = track[_t].end_point
+  original_srcs.level = params:get("vol_".._t)
   track[_t].snapshot.fnl = snapshot.fnl(
     function(r_val)
       track[_t].snapshot.current_value = r_val
       track[_t].start_point = util.linlin(0,1,original_srcs.start_point,snapshots[_t][slot].start_point,r_val)
       track[_t].end_point = util.linlin(0,1,original_srcs.end_point,snapshots[_t][slot].end_point,r_val)
+      params:set("vol_".._t, util.linlin(0,1,original_srcs.level,snapshots[_t][slot].level,r_val))
       softcut.loop_start(_t,track[_t].start_point)
       softcut.loop_end(_t,track[_t].end_point)
       -- softcut.position(_t,snapshots[_t][coll].poll_position)

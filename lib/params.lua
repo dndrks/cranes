@@ -19,6 +19,11 @@ function _params.init()
     params:set_action("speed_voice_"..i,
       function(x)
         softcut.rate(i, speedlist[i][params:get("speed_voice_"..i)]*offset[i])
+        if x < 6 then
+          if not track[i].reverse then track[i].reverse = true end
+        elseif x > 6 then
+          if track[i].reverse then track[i].reverse = false end
+        end
         grid_dirty = true
       end
     )

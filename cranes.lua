@@ -56,19 +56,22 @@ end
 rec = {0,0,0,0}
 clear = {1,1,1,1}
 offset = {1,1,1,1}
+pp = {0,0,0,0}
 
 snapshots = {
   [1] = {},
-  [2] = {}
+  [2] = {},
+  [3] = {},
+  [4] = {}
 }
-for i = 1,TRACKS do
+for i = 1,4 do
   for j = 1,12 do
     snapshots[i][j] = {}
   end
 end
 -- snapshots[voice][coll].start_point = track[voice].start_point
-snapshot_count = {0,0}
-selected_snapshot = {0,0}
+snapshot_count = {0,0,0,0}
+selected_snapshot = {0,0,0,0}
 
 softcut_offsets = {0,0,100,100}
 
@@ -81,6 +84,7 @@ for i=1,4 do
   track[i].pos_grid = -1
   track[i].rec_limit = 0
   track[i].snapshot = {["partial_restore"] = false}
+  track[i].reverse = false
 end
 
 distance = {0,0}
@@ -176,8 +180,8 @@ phase = function(n, x)
       track[n].rec_limit = track[n].end_point
     end
   end
-  pp = ((x - track[n].start_point) / (track[n].end_point - track[n].start_point))
-  x = math.floor(pp * 16)
+  pp[n] = ((x - track[n].start_point) / (track[n].end_point - track[n].start_point))
+  x = math.floor(pp[n] * 8)
   if x ~= track[n].pos_grid then
     track[n].pos_grid = x
   end
@@ -656,144 +660,193 @@ end
 g = grid.connect()
 -- hardware: grid event (eg 'what happens when a button is pressed')
 g.key = function(x,y,z)
--- speed + direction
-  if (y == 1 or y == 5) and z == 1 then
-    local _t = y == 1 and 1 or 2
-    if x <= #speedlist[_t] then
-      params:set("speed_voice_".._t,x)
-    elseif x == 13 then
-      local other_track = _t == 1 and 2 or 1
-      softcut.position(_t,track[other_track].poll_position)
-    elseif x == 14 then
-      local other_track = _t == 1 and 2 or 1
-      track[_t].start_point = track[other_track].start_point
-      softcut.loop_start(_t,track[_t].start_point)
-      track[_t].end_point = track[other_track].end_point
-      softcut.loop_end(_t,track[_t].end_point)
-    elseif x == 15 then
-      softcut.position(_t,track[_t].start_point)
-    end
-    grid_dirty = true
--- snapshots
-  elseif (y == 2 or y == 6) then
-    local _t = y == 2 and 1 or 2
-    if z == 1 then
-      if x <= 8 then
-        if tab.count(snapshots[_t][x]) == 0 then
-          track[_t].snapshot.saver_clock = clock.run(snapshot.save_to_slot,_t,x)
-          -- track[_t].snapshot_mod_index = i
-        else
-          -- local modifier, style = 0,"beats"
-          -- if track[_t].restore_mod then
-          --   modifier =  track[_t].snapshot[i].restore_times[track[_t].snapshot[i].restore_times.mode][track[_t].restore_mod_index]
-          --   style = track[_t].snapshot[i].restore_times.mode
-          -- end
-          snapshot.unpack(_t,x)
-          -- track[_t].snapshot_mod_index = i
-        end
+
+if (y == 2 or y == 4 or y == 6 or y == 8) and x <= 8 and z == 1 then
+  local _t = util.round(y/2)
+  local _block = (track[_t].end_point - track[_t].start_point) / 8
+  local _cutposition = _block * (x-1) + softcut_offsets[_t]
+  if params:string("chittering_mode_".._t) ~= "off" then
+    chitter_stretch[_t].pos = _cutposition
+  else
+    softcut.position(_t,_cutposition)
+  end
+elseif (y == 1 or y == 3 or y == 5 or y == 7) and x <=6 and z == 1 then
+  local _t = util.round(math.ceil(y/2))
+  if not track[_t].reverse then
+    params:set("speed_voice_".._t,x+5)
+  else
+    local reverse_key = {6,5,4,3,2,1}
+    params:set("speed_voice_".._t,reverse_key[x])
+  end
+elseif (y == 1 or y == 3 or y == 5 or y == 7) and x == 7 and z == 1 then
+  local _t = util.round(math.ceil(y/2))
+  track[_t].reverse = not track[_t].reverse
+  print("reverse! ".._t..tostring(track[_t].reverse))
+  local reverse_current = {11,10,9,8,7,6,5,4,3,2,1}
+  params:set("speed_voice_".._t,reverse_current[params:get("speed_voice_".._t)])
+elseif (y == 1 or y == 3 or y == 5 or y == 7) and x == 8 and z == 1 then
+  local _t = util.round(math.ceil(y/2))
+  record(_t)
+elseif (y == 2 or y == 4 or y == 6 or y == 8) and x > 8 then
+  local _t = util.round(y/2)
+  if z == 1 then
+    if x > 8 then
+      x = x-8
+      if tab.count(snapshots[_t][x]) == 0 then
+        track[_t].snapshot.saver_clock = clock.run(snapshot.save_to_slot,_t,x)
+        -- track[_t].snapshot_mod_index = i
+      else
+        -- local modifier, style = 0,"beats"
+        -- if track[_t].restore_mod then
+        --   modifier =  track[_t].snapshot[i].restore_times[track[_t].snapshot[i].restore_times.mode][track[_t].restore_mod_index]
+        --   style = track[_t].snapshot[i].restore_times.mode
+        -- end
+        snapshot.unpack(_t,x)
+        -- track[_t].snapshot_mod_index = i
       end
-    else
-      if track[_t].snapshot.saver_clock ~= nil then
-        clock.cancel(track[_t].snapshot.saver_clock)
-      end
     end
-    grid_dirty = true
--- start point, end point, window
-  elseif (y == 3 or y == 7) and z == 1 then
-    window(y == 3 and 1 or 2, x)
-  elseif (y == 4 or y == 8) and z == 1 then
-    local _t = y == 4 and 1 or 2
-    local _block = (track[_t].end_point - track[_t].start_point) / 16
-    local _cutposition = _block * (x-1)
-    if params:string("chittering_mode_".._t) ~= "off" then
-      chitter_stretch[_t].pos = _cutposition
-    else
-      softcut.position(_t,_cutposition)
+  else
+    if track[_t].snapshot.saver_clock ~= nil then
+      clock.cancel(track[_t].snapshot.saver_clock)
     end
   end
+end
+
+-- speed + direction
+--   if (y == 1 or y == 5) and z == 1 then
+--     local _t = y == 1 and 1 or 2
+--     if x <= #speedlist[_t] then
+--       params:set("speed_voice_".._t,x)
+--     elseif x == 13 then
+--       local other_track = _t == 1 and 2 or 1
+--       softcut.position(_t,track[other_track].poll_position)
+--     elseif x == 14 then
+--       local other_track = _t == 1 and 2 or 1
+--       track[_t].start_point = track[other_track].start_point
+--       softcut.loop_start(_t,track[_t].start_point)
+--       track[_t].end_point = track[other_track].end_point
+--       softcut.loop_end(_t,track[_t].end_point)
+--     elseif x == 15 then
+--       softcut.position(_t,track[_t].start_point)
+--     end
+--     grid_dirty = true
+-- -- snapshots
+--   elseif (y == 2 or y == 6) then
+--     local _t = y == 2 and 1 or 2
+--     if z == 1 then
+--       if x <= 8 then
+--         if tab.count(snapshots[_t][x]) == 0 then
+--           track[_t].snapshot.saver_clock = clock.run(snapshot.save_to_slot,_t,x)
+--           -- track[_t].snapshot_mod_index = i
+--         else
+--           -- local modifier, style = 0,"beats"
+--           -- if track[_t].restore_mod then
+--           --   modifier =  track[_t].snapshot[i].restore_times[track[_t].snapshot[i].restore_times.mode][track[_t].restore_mod_index]
+--           --   style = track[_t].snapshot[i].restore_times.mode
+--           -- end
+--           snapshot.unpack(_t,x)
+--           -- track[_t].snapshot_mod_index = i
+--         end
+--       end
+--     else
+--       if track[_t].snapshot.saver_clock ~= nil then
+--         clock.cancel(track[_t].snapshot.saver_clock)
+--       end
+--     end
+--     grid_dirty = true
+-- -- start point, end point, window
+--   elseif (y == 3 or y == 7) and z == 1 then
+--     window(y == 3 and 1 or 2, x)
+  grid_dirty = true
 end
 
 -- hardware: grid redraw
 function grid_redraw()
   g:all(0)
-  for i = 1,8 do
-    g:led(i,2,tab.count(snapshots[1][i]) > 0 and 5 or 0)
-    g:led(i,6,tab.count(snapshots[2][i]) > 0 and 5 or 0)
-  end
-  for i=1, snapshot_count[2] do
-    g:led(i,6,5)
-  end
-  g:led(15,2,3)
-  g:led(16,2,9)
-  g:led(15,6,3)
-  g:led(16,6,9)
-  for i=1,#speedlist[1] do
-    g:led(i,1,5)
-  end
-  for i=1,#speedlist[2] do
-    g:led(i,5,5)
-  end
-  for i=13,15 do
-    g:led(i,1,5)
-    g:led(i,5,5)
-  end
-  if params:get("speed_voice_1") == 6 then
-    g:led(6,1,12)
-  else
-    g:led(params:get("speed_voice_1"),1,12)
-    g:led(6,1,0)
-  end
-  if params:get("speed_voice_2") == 6 then
-    g:led(6,5,12)
-  else
-    g:led(params:get("speed_voice_2"),5,12)
-    g:led(6,5,0)
-  end
-  if track[1].pos_grid >= 0 and pp < 1.000 then
-    g:led(track[1].pos_grid+1,4,15)
-  else
-    for i = 1,16 do
-      g:led(i,4,0)
+
+  for i = 9,16 do
+    for j = 2,8,2 do
+      local _t = util.round(j/2)
+      g:led(i,j,tab.count(snapshots[_t][i-8]) > 0 and 6 or 3)
+      if selected_snapshot[_t] ~= 0 then
+        g:led(selected_snapshot[_t]+8,j,12)
+      end
     end
   end
-  if track[2].pos_grid >= 0 and pp < 1.000 then
-    g:led(track[2].pos_grid+1,8,15)
-  else
-    for i = 1,16 do
-      g:led(i,8,0)
+
+  for j = 2,8,2 do
+    local _t = util.round(j/2)
+    if track[_t].pos_grid >= 0 and pp[_t] < 1.000 then
+      g:led(track[_t].pos_grid+1,j,15)
+    else
+      for i = 1,8 do
+        g:led(i,j,1)
+      end
     end
   end
-  if clear == 1 then
-    for i = 1,16 do
-      g:led(i,4,0)
-      g:led(i,8,0)
+
+  for i = 1,7,2 do
+    for j = 1,6 do
+      g:led(j,i,3)
     end
+    local _t = math.ceil(i/2)
+    if params:get("speed_voice_".._t) == 6 then
+      g:led(1,i,12)
+    elseif params:get("speed_voice_".._t) > 6 then
+      g:led(params:get("speed_voice_".._t)-5,i,12)
+      g:led(1,i,0)
+    elseif params:get("speed_voice_".._t) < 6 then
+      local reverse_led = {6,5,4,3,2}
+      g:led(reverse_led[params:get("speed_voice_".._t)],i,12)
+      g:led(1,i,0)
+    end
+    g:led(7,i,track[_t].reverse and 15 or 0)
+    g:led(8,i,rec[_t] == 1 and 15 or (clear[_t] == 0 and 8 or 3) or 3)
   end
-  g:led(16,3,5)
-  g:led(15,3,9)
-  g:led(14,3,9)
-  g:led(13,3,5)
-  g:led(10,3,5)
-  g:led(9,3,9)
-  g:led(8,3,9)
-  g:led(7,3,5)
-  g:led(4,3,5)
-  g:led(3,3,9)
-  g:led(2,3,9)
-  g:led(1,3,5)
-  g:led(16,7,5)
-  g:led(15,7,9)
-  g:led(14,7,9)
-  g:led(13,7,5)
-  g:led(10,7,5)
-  g:led(9,7,9)
-  g:led(8,7,9)
-  g:led(7,7,5)
-  g:led(4,7,5)
-  g:led(3,7,9)
-  g:led(2,7,9)
-  g:led(1,7,5)
-  g:led(selected_snapshot[1],2,12)
-  g:led(selected_snapshot[2],6,12)
+  
+  -- for i=1, snapshot_count[2] do
+  --   g:led(i,6,5)
+  -- end
+  -- g:led(15,2,3)
+  -- g:led(16,2,9)
+  -- g:led(15,6,3)
+  -- g:led(16,6,9)
+  -- for i=13,15 do
+  --   g:led(i,1,5)
+  --   g:led(i,5,5)
+  -- end
+
+  -- if clear == 1 then
+  --   for i = 1,16 do
+  --     g:led(i,4,0)
+  --     g:led(i,8,0)
+  --   end
+  -- end
+  -- g:led(16,3,5)
+  -- g:led(15,3,9)
+  -- g:led(14,3,9)
+  -- g:led(13,3,5)
+  -- g:led(10,3,5)
+  -- g:led(9,3,9)
+  -- g:led(8,3,9)
+  -- g:led(7,3,5)
+  -- g:led(4,3,5)
+  -- g:led(3,3,9)
+  -- g:led(2,3,9)
+  -- g:led(1,3,5)
+  -- g:led(16,7,5)
+  -- g:led(15,7,9)
+  -- g:led(14,7,9)
+  -- g:led(13,7,5)
+  -- g:led(10,7,5)
+  -- g:led(9,7,9)
+  -- g:led(8,7,9)
+  -- g:led(7,7,5)
+  -- g:led(4,7,5)
+  -- g:led(3,7,9)
+  -- g:led(2,7,9)
+  -- g:led(1,7,5)
+  -- g:led(selected_snapshot[1],2,12)
+  -- g:led(selected_snapshot[2],6,12)
   g:refresh()
 end
