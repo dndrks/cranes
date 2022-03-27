@@ -182,24 +182,26 @@ function draw_hardware()
   end
 end
 
-phase = function(n, x)
-  track[n].poll_position = x
-  if rec[n] == 1 and clear[n] == 1 then
-    if x > track[n].rec_limit then
-      track[n].rec_limit = x
+function phase(n, x)
+  if track[n].playing then
+    track[n].poll_position = x
+    if rec[n] == 1 and clear[n] == 1 then
+      if x > track[n].rec_limit then
+        track[n].rec_limit = x
+      end
+    elseif rec[n] == 1 and clear[n] == 0 then
+      if (x > track[n].rec_limit) and (track[n].end_point > track[n].rec_limit) then
+        track[n].rec_limit = track[n].end_point
+      end
     end
-  elseif rec[n] == 1 and clear[n] == 0 then
-    if (x > track[n].rec_limit) and (track[n].end_point > track[n].rec_limit) then
-      track[n].rec_limit = track[n].end_point
+    pp[n] = ((x - track[n].start_point) / (track[n].end_point - track[n].start_point))
+    x = math.floor(pp[n] * 8)
+    if x ~= track[n].pos_grid then
+      track[n].pos_grid = x
     end
+    grid_dirty = true
+    screen_dirty = true
   end
-  pp[n] = ((x - track[n].start_point) / (track[n].end_point - track[n].start_point))
-  x = math.floor(pp[n] * 8)
-  if x ~= track[n].pos_grid then
-    track[n].pos_grid = x
-  end
-  grid_dirty = true
-  screen_dirty = true
 end
 
 function warble()
@@ -257,6 +259,7 @@ function clear_track(_t)
   softcut.rec_level(_t, 0)
   softcut.level(_t, 0)
   softcut.play(_t, 0)
+  track[_t].playing = false
   softcut.position(_t, scaled[_t][2])
   softcut.rate(_t, 1*offset[_t])
   softcut.loop_start(_t, scaled[_t][2])
@@ -362,6 +365,9 @@ function record(_t,silent)
         end
       )
     end
+  else
+    record_execute(_t,silent)
+    holding_crane[_t] = 0
   end
 
 end
@@ -390,6 +396,7 @@ function record_execute(_t,silent)
     softcut.rec_level(_t,1)
     softcut.level(_t, 0)
     softcut.poll_start_phase()
+    track[_t].playing = true
     recording_crane[_t] = 1
     screen_dirty = true
     counter:start()
@@ -401,6 +408,7 @@ function record_execute(_t,silent)
     softcut.rec_level(_t,0)
     counter:stop()
     softcut.poll_start_phase()
+    track[_t].playing = true
     -- track[_t].end_point = util.round(softcut_offsets[_t] + rec_time[_t],0.01)
     if params:string("loop_sizing_voice_".._t) == "dialed (w/encoders)" then
       -- track[_t].end_point = (softcut_offsets[_t] + rec_time[_t])
@@ -721,27 +729,33 @@ g.key = function(x,y,z)
 
 if (y == 2 or y == 4 or y == 6 or y == 8) and x <= 8 and z == 1 then
   local _t = util.round(y/2)
-  local _block = (track[_t].end_point - track[_t].start_point) / 8
-  local _cutposition = _block * (x-1) + softcut_offsets[_t]
-  if params:string("chittering_mode_".._t) ~= "off" then
-    chitter_stretch[_t].pos = _cutposition
-  else
-    softcut.position(_t,_cutposition)
+  if rec[_t] == 0 or (rec[_t] == 1 and clear[_t] == 0) then
+    local _block = (track[_t].end_point - track[_t].start_point) / 8
+    local _cutposition = _block * (x-1) + softcut_offsets[_t]
+    if params:string("chittering_mode_".._t) ~= "off" then
+      chitter_stretch[_t].pos = _cutposition
+    else
+      softcut.position(_t,_cutposition)
+    end
   end
 elseif (y == 1 or y == 3 or y == 5 or y == 7) and x <=6 and z == 1 then
   local _t = util.round(math.ceil(y/2))
-  if not track[_t].reverse then
-    params:set("speed_voice_".._t,x+5)
-  else
-    local reverse_key = {6,5,4,3,2,1}
-    params:set("speed_voice_".._t,reverse_key[x])
+  if rec[_t] == 0 or (rec[_t] == 1 and clear[_t] == 0) then
+    if not track[_t].reverse then
+      params:set("speed_voice_".._t,x+5)
+    else
+      local reverse_key = {6,5,4,3,2,1}
+      params:set("speed_voice_".._t,reverse_key[x])
+    end
   end
 elseif (y == 1 or y == 3 or y == 5 or y == 7) and x == 7 and z == 1 then
   local _t = util.round(math.ceil(y/2))
-  track[_t].reverse = not track[_t].reverse
-  print("reverse! ".._t..tostring(track[_t].reverse))
-  local reverse_current = {11,10,9,8,7,6,5,4,3,2,1}
-  params:set("speed_voice_".._t,reverse_current[params:get("speed_voice_".._t)])
+  if rec[_t] == 0 or (rec[_t] == 1 and clear[_t] == 0) then
+    track[_t].reverse = not track[_t].reverse
+    print("reverse! ".._t..tostring(track[_t].reverse))
+    local reverse_current = {11,10,9,8,7,6,5,4,3,2,1}
+    params:set("speed_voice_".._t,reverse_current[params:get("speed_voice_".._t)])
+  end
 elseif (y == 1 or y == 3 or y == 5 or y == 7) and x == 8 and z == 1 then
   local _t = util.round(math.ceil(y/2))
   record(_t)
