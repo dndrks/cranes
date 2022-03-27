@@ -127,6 +127,31 @@ function _params.init()
 
   chitter.init_params()
 
+  params:add_group("recording",10)
+  params:add_separator("loop sizing")
+  for i = 1,4 do
+    params:add_option("loop_sizing_voice_"..i, "voice ["..i.."]",{"manual (w/key)","dialed (w/encoders)"})
+    params:set_action("loop_sizing_voice_"..i,function(x)
+      if x == 1 and rec[i] == 0 and clear[i] == 1 then
+        -- reset to 60 seconds or max beat count
+      else
+        -- reset to 8 seconds or 16 beats
+      end
+    end)
+  end
+
+  params:add_separator("record trigger")
+  for i = 1,4 do
+    params:add_option("rec_trigger_voice_"..i, "voice ["..i.."]",{"free","threshold","clock"})
+    params:set_action("rec_trigger_voice_"..i,function(x)
+      if x == 1 and rec[i] == 0 and clear[i] == 1 then
+        
+      else
+        
+      end
+    end)
+  end
+
   params:add_group("misc",7)
   params:add_option("KEY3","KEY3", {"~~", "0.5", "-1", "1.5", "2"}, 1)
   params:set_action("KEY3", function(x) KEY3 = x end)

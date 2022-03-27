@@ -102,17 +102,21 @@ function init()
   softcut.level_input_cut(2, 2, 1.0)
   softcut.buffer(1,1)
   softcut.buffer(2,2)
+  softcut.buffer(3,1)
+  softcut.buffer(4,2)
+  softcut.enable(5,0)
+  softcut.enable(6,0)
   
   for i = 1, 4 do
     softcut.level(i,1.0)
-    softcut.play(i, 1)
+    softcut.play(i, 0) -- TODO CONFIRM GOOD
     softcut.rate(i, 1*offset[i])
     softcut.loop_start(i, softcut_offsets[i])
     softcut.loop_end(i, 60+softcut_offsets[i])
     softcut.loop(i, 1)
     softcut.fade_time(i, 0.01)
-    softcut.rec(i, 1)
-    softcut.rec_level(i, 1)
+    softcut.rec(i, 1) -- TODO CONFIRM GOOD
+    softcut.rec_level(i, 0)
     softcut.pre_level(i, 1)
     softcut.position(i, softcut_offsets[i])
     softcut.phase_quant(i, 0.01)
@@ -146,12 +150,21 @@ function init()
   grid_dirty = true
   screen_dirty = true
   
-  softcut.poll_start_phase()
+  -- softcut.poll_start_phase()
 
   softcut.pre_filter_dry(1,1)
   softcut.pre_filter_dry(2,1)
   softcut.pre_filter_dry(3,1)
   softcut.pre_filter_dry(4,1)
+
+  -- dev
+  for i = 1,4 do
+    params:set("loop_sizing_voice_"..i, 2)
+    params:set("rec_trigger_voice_"..i, 3)
+    track[i].end_point = softcut_offsets[i]+8
+    softcut.recpre_slew_time(i,0.01)
+    softcut.enable(i,1)
+  end
 end
 
 function grid.add()
@@ -241,7 +254,7 @@ function clear_track(_t)
     {1,softcut_offsets[3],60 + softcut_offsets[3]},
     {2,softcut_offsets[4],60 + softcut_offsets[4]},
   }
-  softcut.rec_level(_t, 1)
+  softcut.rec_level(_t, 0)
   softcut.level(_t, 0)
   softcut.play(_t, 0)
   softcut.position(_t, scaled[_t][2])
@@ -335,10 +348,29 @@ function window(voice,x)
 end
 
 function record(_t,silent)
+
+  if params:string("rec_trigger_voice_".._t) == "clock" then
+    if rec[_t] == 0 and clear[_t] == 1 then
+      holding_crane[_t]= 1
+      screen_dirty = true
+      clock.run(
+        function()
+          -- clock.sync(4,-1/16)
+          clock.sync(4)
+          record_execute(_t,silent)
+          holding_crane[_t] = 0
+        end
+      )
+    end
+  end
+
+end
+
+function record_execute(_t,silent)
   if not silent then
     rec[_t] = rec[_t] == 0 and 1 or 0
   end
-  -- if the buffer is clear and key 2 is pressed:
+  -- if the buffer is clear and recording is enabled:
   -- main recording will enable
   if rec[_t] == 1 and clear[_t] == 1 then
     local scaled = {
@@ -348,13 +380,16 @@ function record(_t,silent)
       {1,softcut_offsets[3]},
       {2,softcut_offsets[4]}
     }
-    softcut.buffer_clear_region_channel(scaled[_t][1],scaled[_t][2],60)
+    -- softcut.buffer_clear_region_channel(scaled[_t][1],scaled[_t][2],60)
+    softcut.position(_t,track[_t].start_point)
     softcut.rate_slew_time(_t,0.01)
-    softcut.enable(_t, 1)
+    -- softcut.enable(_t, 1)
     softcut.rate(_t, 1*offset[_t])
     softcut.play(_t, 1)
-    softcut.rec(_t, 1)
+    -- softcut.rec(_t, 1)
+    softcut.rec_level(_t,1)
     softcut.level(_t, 0)
+    softcut.poll_start_phase()
     recording_crane[_t] = 1
     screen_dirty = true
     counter:start()
@@ -366,7 +401,12 @@ function record(_t,silent)
     softcut.rec_level(_t,0)
     counter:stop()
     softcut.poll_start_phase()
-    track[_t].end_point = softcut_offsets[_t] + rec_time[_t]
+    -- track[_t].end_point = util.round(softcut_offsets[_t] + rec_time[_t],0.01)
+    if params:string("loop_sizing_voice_".._t) == "dialed (w/encoders)" then
+      -- track[_t].end_point = (softcut_offsets[_t] + rec_time[_t])
+    else
+      track[_t].end_point = (softcut_offsets[_t] + rec_time[_t])
+    end
     print(_t,track[_t].end_point)
     softcut.loop_end(_t,track[_t].end_point)
     softcut.loop_start(_t,track[_t].start_point)
@@ -388,6 +428,19 @@ function record(_t,silent)
   -- overwrite/overdub behavior will disable
   elseif rec[_t] == 0 and clear[_t] == 0 then
     toggle_overdub(_t,"off")
+  end
+
+  if params:string("loop_sizing_voice_".._t) == "dialed (w/encoders)" then
+    print("eval loop")
+    if rec[_t] == 1 and clear[_t] == 1 then
+      clock.run(
+        function()
+          clock.sleep(track[_t].end_point - track[_t].start_point)
+          print("yep")
+          record_execute(_t)
+        end
+      )
+    end
   end
 end
 
@@ -425,6 +478,7 @@ ray = 0.0
 KEY3 = 1
 recording_crane = {0,0,0,0}
 overdub_crane = {0,0,0,0}
+holding_crane = {0,0,0,0}
 c2 = math.random(4,12)
 
 -- key hardware interaction
@@ -569,9 +623,9 @@ function redraw()
     screen.move(0,50)
     -- local _t = KEY1_press % 2 == 0 and 1 or 2
     local _t = voice_on_screen
-    screen.text("s".._t..": "..util.round(track[_t].start_point - softcut_offsets[_t],0.01))
+    screen.text("s".._t..": "..util.round(track[_t].start_point - softcut_offsets[_t],0.01).."s")
     screen.move(0,60)
-    screen.text("e".._t..": "..util.round(track[_t].end_point - softcut_offsets[_t],0.01))
+    screen.text("e".._t..": "..util.round(track[_t].end_point - softcut_offsets[_t],0.01).."s")
     screen.move(0,40)
     screen.text("o".._t..": "..over[_t])
     if recording_crane[_t] == 1 then
@@ -581,12 +635,16 @@ function redraw()
         crane2()
       end
     end
+    if holding_crane[_t] == 1 then
+      screen.move(40,35)
+      screen.text("WAITING FOR BEAT")
+    end
     screen.level(3)
     screen.move(0,10)
     if voice_on_screen == 1 or voice_on_screen == 2 then
-      screen.text("one: "..util.round(track[1].poll_position,0.1))
+      screen.text("one: "..util.round(track[1].poll_position,0.1).."s")
       screen.move(0,20)
-      screen.text("two: "..util.round(track[2].poll_position,0.1))
+      screen.text("two: "..util.round(track[2].poll_position,0.1).."s")
     else
       screen.text((_t == 3 and "three: " or "four: ")..util.round(track[_t].poll_position - softcut_offsets[_t],0.1))
     end

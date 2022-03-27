@@ -69,4 +69,19 @@ function ca.load_sample(file,sample,summed)
   end
 end
 
+function ca.clock_try()
+  clock.run(
+    function()
+      clock.sync(4)
+      for i = 1,4 do
+        record(i)
+      end
+      clock.sleep(clock.get_beat_sec() * 16)
+      for i = 1,4 do
+        record(i)
+      end
+    end
+  )
+end
+
 return ca
