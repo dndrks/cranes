@@ -102,7 +102,7 @@ function _params.init()
     params:add_separator("voice "..i)
     params:add_control("pan_"..i,"pan",controlspec.new(-1,1,'lin',0.01,pan_defaults[i],''))
     params:set_action("pan_"..i, function(x) softcut.pan(i, x) end)
-    params:add_control("pan_slew_"..i,"slew", controlspec.new(0, 200, "lin", 0.01, 10, ""))
+    params:add_control("pan_slew_"..i,"slew", controlspec.new(0, 20, "lin", 0.01, 1, ""))
     params:set_action("pan_slew_"..i, function(x) softcut.pan_slew_time(i, x) end)
   end
 

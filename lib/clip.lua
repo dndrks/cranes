@@ -54,12 +54,14 @@ function ca.load_sample(file,sample,summed)
     softcut.buffer_read_mono(file, 0, scaled[sample][2], clip[sample].sample_length + 0.05, im_ch, scaled[sample][1])
     track[sample].end_point = (clip[sample].sample_length-0.01) + softcut_offsets[sample]
     softcut.enable(sample, 1)
-    softcut.play(sample, 1)
+    track[sample].playing = true
+    softcut.poll_start_phase()
     softcut.rec_level(sample,0)
     softcut.level(sample, params:get("vol_"..sample))
     softcut.loop_start(sample,track[sample].start_point)
     softcut.loop_end(sample,track[sample].end_point)
     softcut.position(sample,track[sample].start_point)
+    softcut.play(sample, 1)
     chitter_stretch[sample].pos = track[sample].start_point
     clear[sample] = 0
     track[sample].rec_limit = 0

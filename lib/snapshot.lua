@@ -10,6 +10,10 @@ function snapshot.pack(voice,coll)
 end
 
 function snapshot.unpack(voice, coll)
+  if track[voice].snapshot.partial_restore then
+    clock.cancel(track[voice].snapshot.fnl)
+    track[voice].snapshot.partial_restore = false
+  end
   local change_position = false
   if track[voice].start_point ~= snapshots[voice][coll].start_point
   and track[voice].end_point ~= snapshots[voice][coll].end_point then
@@ -72,7 +76,19 @@ snapshot.funnel_done_action = function(voice,coll)
 end
 
 
-function try_it(_t,slot,sec)
+function try_it(_t,slot,sec,style)
+  if track[_t].snapshot.partial_restore then
+    clock.cancel(track[_t].snapshot.fnl)
+    snapshot.funnel_done_action(_t,slot)
+  end
+  track[_t].snapshot.partial_restore = true
+  if style ~= nil then
+    if style == "beats" then
+      sec = clock.get_beat_sec()*sec
+    elseif style == "time" then
+      sec = sec
+    end
+  end
   local original_srcs = {}
   original_srcs.start_point = track[_t].start_point
   original_srcs.end_point = track[_t].end_point

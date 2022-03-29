@@ -72,6 +72,7 @@ end
 -- snapshots[voice][coll].start_point = track[voice].start_point
 snapshot_count = {0,0,0,0}
 selected_snapshot = {0,0,0,0}
+snapshot_mod_index = 0
 
 softcut_offsets = {0,0,100,100}
 
@@ -601,6 +602,7 @@ function enc(n,d)
     -- end
   end
   screen_dirty = true
+  grid_dirty = true
 end
 
 -- displaying stuff on the screen
@@ -654,11 +656,11 @@ function redraw()
       screen.move(0,20)
       screen.text("two: "..util.round(track[2].poll_position,0.1).."s")
     else
-      screen.text((_t == 3 and "three: " or "four: ")..util.round(track[_t].poll_position - softcut_offsets[_t],0.1))
+      screen.text((_t == 3 and "three: " or "four: ")..util.round(track[_t].poll_position - softcut_offsets[_t],0.1).."s")
     end
   end
   screen.update()
-  end
+end
 
 -- crane drawing
 function crane()
@@ -727,8 +729,8 @@ g = grid.connect()
 -- hardware: grid event (eg 'what happens when a button is pressed')
 g.key = function(x,y,z)
 
-if (y == 2 or y == 4 or y == 6 or y == 8) and x <= 8 and z == 1 then
-  local _t = util.round(y/2)
+if y >= 5 and y <= 8 and x <= 8 and z == 1 then
+  local _t = y-4
   if rec[_t] == 0 or (rec[_t] == 1 and clear[_t] == 0) then
     local _block = (track[_t].end_point - track[_t].start_point) / 8
     local _cutposition = _block * (x-1) + softcut_offsets[_t]
@@ -738,8 +740,8 @@ if (y == 2 or y == 4 or y == 6 or y == 8) and x <= 8 and z == 1 then
       softcut.position(_t,_cutposition)
     end
   end
-elseif (y == 1 or y == 3 or y == 5 or y == 7) and x <=6 and z == 1 then
-  local _t = util.round(math.ceil(y/2))
+elseif y >= 1 and y <= 4 and x <=6 and z == 1 then
+  local _t = y
   if rec[_t] == 0 or (rec[_t] == 1 and clear[_t] == 0) then
     if not track[_t].reverse then
       params:set("speed_voice_".._t,x+5)
@@ -748,22 +750,21 @@ elseif (y == 1 or y == 3 or y == 5 or y == 7) and x <=6 and z == 1 then
       params:set("speed_voice_".._t,reverse_key[x])
     end
   end
-elseif (y == 1 or y == 3 or y == 5 or y == 7) and x == 7 and z == 1 then
-  local _t = util.round(math.ceil(y/2))
+elseif y >= 1 and y <= 4 and x == 7 and z == 1 then
+  local _t = y
   if rec[_t] == 0 or (rec[_t] == 1 and clear[_t] == 0) then
     track[_t].reverse = not track[_t].reverse
-    print("reverse! ".._t..tostring(track[_t].reverse))
     local reverse_current = {11,10,9,8,7,6,5,4,3,2,1}
     params:set("speed_voice_".._t,reverse_current[params:get("speed_voice_".._t)])
   end
-elseif (y == 1 or y == 3 or y == 5 or y == 7) and x == 8 and z == 1 then
-  local _t = util.round(math.ceil(y/2))
+elseif y >= 1 and y <= 4 and x == 8 and z == 1 then
+  local _t = y
   record(_t)
-elseif (y == 2 or y == 4 or y == 6 or y == 8) and x > 8 then
-  local _t = util.round(y/2)
+elseif y >= 1 and y <= 4 and x >= 11 then
+  local _t = y
   if z == 1 then
-    if x > 8 then
-      x = x-8
+    if x >= 11 then
+      x = x-10
       if tab.count(snapshots[_t][x]) == 0 then
         track[_t].snapshot.saver_clock = clock.run(snapshot.save_to_slot,_t,x)
         -- track[_t].snapshot_mod_index = i
@@ -773,7 +774,11 @@ elseif (y == 2 or y == 4 or y == 6 or y == 8) and x > 8 then
         --   modifier =  track[_t].snapshot[i].restore_times[track[_t].snapshot[i].restore_times.mode][track[_t].restore_mod_index]
         --   style = track[_t].snapshot[i].restore_times.mode
         -- end
-        snapshot.unpack(_t,x)
+        if snapshot_mod_index == 0 then
+          snapshot.unpack(_t,x)
+        else
+          try_it(_t,x,snapshot_mod_index,"sec")
+        end
         -- track[_t].snapshot_mod_index = i
       end
     end
@@ -782,6 +787,16 @@ elseif (y == 2 or y == 4 or y == 6 or y == 8) and x > 8 then
       clock.cancel(track[_t].snapshot.saver_clock)
     end
   end
+elseif y == 5 and x >= 11 and x <= 16 then
+  if z == 0 then
+    snapshot_mod_index = 0
+  else
+    snapshot_mod_index = x-10
+  end
+elseif y == 8 and x >= 13 and x <= 16 and z == 1 then
+  local _t = x-12
+  voice_on_screen = _t
+  screen_dirty = true
 end
 
 -- speed + direction
@@ -836,32 +851,31 @@ end
 function grid_redraw()
   g:all(0)
 
-  for i = 9,16 do
-    for j = 2,8,2 do
-      local _t = util.round(j/2)
-      g:led(i,j,tab.count(snapshots[_t][i-8]) > 0 and 6 or 3)
+  for i = 11,16 do
+    for j = 1,4 do
+      local _t = j
+      g:led(i,j,tab.count(snapshots[_t][i-10]) > 0 and 6 or 3)
       if selected_snapshot[_t] ~= 0 then
-        g:led(selected_snapshot[_t]+8,j,12)
+        g:led(selected_snapshot[_t]+10,j,12)
       end
     end
   end
 
-  for j = 2,8,2 do
-    local _t = util.round(j/2)
+  for j = 5,8 do
+    for i = 1,8 do
+      g:led(i,j,1)
+    end
+    local _t = j-4
     if track[_t].pos_grid >= 0 and pp[_t] < 1.000 then
       g:led(track[_t].pos_grid+1,j,15)
-    else
-      for i = 1,8 do
-        g:led(i,j,1)
-      end
     end
   end
 
-  for i = 1,7,2 do
+  for i = 1,4 do
     for j = 1,6 do
       g:led(j,i,3)
     end
-    local _t = math.ceil(i/2)
+    local _t = i
     if params:get("speed_voice_".._t) == 6 then
       g:led(1,i,12)
     elseif params:get("speed_voice_".._t) > 6 then
@@ -874,6 +888,10 @@ function grid_redraw()
     end
     g:led(7,i,track[_t].reverse and 15 or 0)
     g:led(8,i,rec[_t] == 1 and 15 or (clear[_t] == 0 and 8 or 3) or 3)
+  end
+
+  for i = 1,4 do
+    g:led(i+12,8,voice_on_screen == i and 12 or 3)
   end
   
   -- for i=1, snapshot_count[2] do
