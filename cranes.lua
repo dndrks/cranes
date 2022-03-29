@@ -72,7 +72,7 @@ end
 -- snapshots[voice][coll].start_point = track[voice].start_point
 snapshot_count = {0,0,0,0}
 selected_snapshot = {0,0,0,0}
-snapshot_mod_index = 0
+snapshot_mod = {["index"] = 0, ["held"] = {false,false,false,false,false,false}}
 
 softcut_offsets = {0,0,100,100}
 
@@ -591,15 +591,11 @@ function enc(n,d)
     if KEY1_hold then
       voice_on_screen = util.clamp(voice_on_screen + d, 1, 4)
     else
-      over[_t] = util.clamp((over[_t] + d/100), 0.0,1.0)
+      over[_t] = util.round(util.clamp((over[_t] + d/100), 0.0,1.0),0.01)
       if rec[voice_on_screen] % 2 == 1 then
         softcut.pre_level(_t,math.abs(over[_t]-1))
       end
     end
-    -- over[_t] = util.clamp((over[_t] + d/100), 0.0,1.0)
-    -- if rec % 2 == 1 then
-    --   softcut.pre_level(_t,math.abs(over[_t]-1))
-    -- end
   end
   screen_dirty = true
   grid_dirty = true
@@ -774,10 +770,10 @@ elseif y >= 1 and y <= 4 and x >= 11 then
         --   modifier =  track[_t].snapshot[i].restore_times[track[_t].snapshot[i].restore_times.mode][track[_t].restore_mod_index]
         --   style = track[_t].snapshot[i].restore_times.mode
         -- end
-        if snapshot_mod_index == 0 then
+        if snapshot_mod.index == 0 then
           snapshot.unpack(_t,x)
         else
-          try_it(_t,x,snapshot_mod_index,"sec")
+          try_it(_t,x,snapshot_mod.index,"sec")
         end
         -- track[_t].snapshot_mod_index = i
       end
@@ -789,9 +785,14 @@ elseif y >= 1 and y <= 4 and x >= 11 then
   end
 elseif y == 5 and x >= 11 and x <= 16 then
   if z == 0 then
-    snapshot_mod_index = 0
+    snapshot_mod.held[x-10] = false
+    if tab.contains(snapshot_mod.held,true) then
+    else
+      snapshot_mod.index = 0
+    end
   else
-    snapshot_mod_index = x-10
+    snapshot_mod.held[x-10] = true
+    snapshot_mod.index = x-10
   end
 elseif y == 8 and x >= 13 and x <= 16 and z == 1 then
   local _t = x-12

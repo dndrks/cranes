@@ -27,7 +27,7 @@ end
 function ca.load_sample(file,sample,summed)
   local old_min = clip[sample].min
   local old_max = clip[sample].max
-  if file ~= "-" then
+  if file ~= "-" and file ~= "" then
     local ch, len, rate = audio.file_info(file)
     clip[sample].sample_rate = rate
     if clip[sample].sample_rate ~= 48000 then

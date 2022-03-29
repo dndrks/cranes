@@ -6,8 +6,8 @@ function _params.init()
   params:add_group("clips",4)
   
   for i = 1,4 do
-    params:add_file("clip "..i.." sample", "sample ["..i.."]")
-    params:set_action("clip "..i.." sample", function(file) _ca.load_sample(file,i) end)
+    params:add_file("clip "..i.." sample", "sample ["..i.."]", _path.audio)
+    params:set_action("clip "..i.." sample", function(file) if file ~= _path.audio then _ca.load_sample(file,i) end end)
   end
 
   params:add_group("rates",10)
