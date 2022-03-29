@@ -6,6 +6,12 @@ function snapshot.pack(voice,coll)
   -- snapshots[voice][coll].poll_position = track[voice].poll_position
   snapshots[voice][coll].rate = params:get("speed_voice_"..voice)
   snapshots[voice][coll].level = params:get("vol_"..voice)
+  snapshots[voice][coll].fc = params:get("post_filter_fc_"..voice)
+  snapshots[voice][coll].lp = params:get("post_filter_lp_"..voice)
+  snapshots[voice][coll].hp = params:get("post_filter_hp_"..voice)
+  snapshots[voice][coll].bp = params:get("post_filter_bp_"..voice)
+  snapshots[voice][coll].dry = params:get("post_filter_dry_"..voice)
+  snapshots[voice][coll].rq = params:get("post_filter_rq_"..voice)
   selected_snapshot[voice] = coll
 end
 
@@ -29,6 +35,12 @@ function snapshot.unpack(voice, coll)
   end
   params:set("speed_voice_"..voice, snapshots[voice][coll].rate)
   params:set("vol_"..voice,snapshots[voice][coll].level)
+  params:set("post_filter_fc_"..voice, snapshots[voice][coll].fc)
+  params:set("post_filter_lp_"..voice, snapshots[voice][coll].lp)
+  params:set("post_filter_hp_"..voice, snapshots[voice][coll].hp)
+  params:set("post_filter_bp_"..voice, snapshots[voice][coll].bp)
+  params:set("post_filter_dry_"..voice, snapshots[voice][coll].dry)
+  params:set("post_filter_rq_"..voice, snapshots[voice][coll].rq)
   screen_dirty = true
   grid_dirty = true
   selected_snapshot[voice] = coll
@@ -93,12 +105,24 @@ function try_it(_t,slot,sec,style)
   original_srcs.start_point = track[_t].start_point
   original_srcs.end_point = track[_t].end_point
   original_srcs.level = params:get("vol_".._t)
+  original_srcs.fc = params:get("post_filter_fc_".._t)
+  original_srcs.lp = params:get("post_filter_lp_".._t)
+  original_srcs.hp = params:get("post_filter_hp_".._t)
+  original_srcs.bp = params:get("post_filter_bp_".._t)
+  original_srcs.dry = params:get("post_filter_dry_".._t)
+  original_srcs.rq = params:get("post_filter_rq_".._t)
   track[_t].snapshot.fnl = snapshot.fnl(
     function(r_val)
       track[_t].snapshot.current_value = r_val
       track[_t].start_point = util.linlin(0,1,original_srcs.start_point,snapshots[_t][slot].start_point,r_val)
       track[_t].end_point = util.linlin(0,1,original_srcs.end_point,snapshots[_t][slot].end_point,r_val)
       params:set("vol_".._t, util.linlin(0,1,original_srcs.level,snapshots[_t][slot].level,r_val))
+      params:set("post_filter_fc_".._t, util.linlin(0,1,original_srcs.fc,snapshots[_t][slot].fc,r_val))
+      params:set("post_filter_lp_".._t, util.linlin(0,1,original_srcs.lp,snapshots[_t][slot].lp,r_val))
+      params:set("post_filter_hp_".._t, util.linlin(0,1,original_srcs.hp,snapshots[_t][slot].hp,r_val))
+      params:set("post_filter_bp_".._t, util.linlin(0,1,original_srcs.bp,snapshots[_t][slot].bp,r_val))
+      params:set("post_filter_dry_".._t, util.linlin(0,1,original_srcs.dry,snapshots[_t][slot].dry,r_val))
+      params:set("post_filter_rq_".._t, util.linlin(0,1,original_srcs.rq,snapshots[_t][slot].rq,r_val))
       softcut.loop_start(_t,track[_t].start_point)
       softcut.loop_end(_t,track[_t].end_point)
       -- softcut.position(_t,snapshots[_t][coll].poll_position)

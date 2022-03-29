@@ -153,10 +153,10 @@ function init()
   
   -- softcut.poll_start_phase()
 
-  softcut.pre_filter_dry(1,1)
-  softcut.pre_filter_dry(2,1)
-  softcut.pre_filter_dry(3,1)
-  softcut.pre_filter_dry(4,1)
+  -- softcut.pre_filter_dry(1,1)
+  -- softcut.pre_filter_dry(2,1)
+  -- softcut.pre_filter_dry(3,1)
+  -- softcut.pre_filter_dry(4,1)
 
   -- dev
   for i = 1,4 do
