@@ -33,6 +33,7 @@ _params = include 'lib/params'
 snapshot = include 'lib/snapshot'
 chitter = include 'lib/chitter'
 _ca = include 'lib/clip'
+_lfos = include 'lib/lfos'
 
 DATA_DIR = _path.data.."cranes/"
 AUDIO_DIR = _path.audio.."cranes/"

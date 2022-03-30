@@ -94,17 +94,9 @@ function _params.init()
     end)
   end
 
+  _lfos.add_params("vol_")
 
-  params:add_group("panning",12)
-  --
-  local pan_defaults = {-1,1,0,0}
-  for i = 1,4 do
-    params:add_separator("voice "..i)
-    params:add_control("pan_"..i,"pan",controlspec.new(-1,1,'lin',0.01,pan_defaults[i],''))
-    params:set_action("pan_"..i, function(x) softcut.pan(i, x) end)
-    params:add_control("pan_slew_"..i,"slew", controlspec.new(0, 20, "lin", 0.01, 1, ""))
-    params:set_action("pan_slew_"..i, function(x) softcut.pan_slew_time(i, x) end)
-  end
+  _lfos.add_params("pan_")
 
   params:add_group("filters",28)
   --

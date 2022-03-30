@@ -34,7 +34,10 @@ function snapshot.unpack(voice, coll)
     softcut.position(voice,snapshots[voice][coll].start_point)
   end
   params:set("speed_voice_"..voice, snapshots[voice][coll].rate)
-  params:set("vol_"..voice,snapshots[voice][coll].level)
+  -- TODO ADD LFO STATES TO SNAPSHOTS
+  if params:get("lfo_vol_"..voice) == "off" then
+    params:set("vol_"..voice,snapshots[voice][coll].level)
+  end
   params:set("post_filter_fc_"..voice, snapshots[voice][coll].fc)
   params:set("post_filter_lp_"..voice, snapshots[voice][coll].lp)
   params:set("post_filter_hp_"..voice, snapshots[voice][coll].hp)
@@ -116,7 +119,9 @@ function try_it(_t,slot,sec,style)
       track[_t].snapshot.current_value = r_val
       track[_t].start_point = util.linlin(0,1,original_srcs.start_point,snapshots[_t][slot].start_point,r_val)
       track[_t].end_point = util.linlin(0,1,original_srcs.end_point,snapshots[_t][slot].end_point,r_val)
-      params:set("vol_".._t, util.linlin(0,1,original_srcs.level,snapshots[_t][slot].level,r_val))
+      if params:get("lfo_vol_".._t) == "off" then
+        params:set("vol_".._t, util.linlin(0,1,original_srcs.level,snapshots[_t][slot].level,r_val))
+      end
       params:set("post_filter_fc_".._t, util.linlin(0,1,original_srcs.fc,snapshots[_t][slot].fc,r_val))
       params:set("post_filter_lp_".._t, util.linlin(0,1,original_srcs.lp,snapshots[_t][slot].lp,r_val))
       params:set("post_filter_hp_".._t, util.linlin(0,1,original_srcs.hp,snapshots[_t][slot].hp,r_val))
