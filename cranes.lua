@@ -108,7 +108,7 @@ function init()
     function(x)
       softcut.rate(1, speedlist_1[params:get("speed_voice_1")]*offset)
       params:set("speed1_midi", params:get("speed_voice_1"))
-      grid_redraw()
+      grid_dirty = true
     end
   )
   params:add_option("speed_voice_2","speed voice 2", speedlist_2)
@@ -117,7 +117,7 @@ function init()
     function(x)
       softcut.rate(2, speedlist_2[params:get("speed_voice_2")]*offset)
       params:set("speed2_midi", params:get("speed_voice_2"))
-      grid_redraw()
+      grid_dirty = true
     end
   )
   params:add_separator()
@@ -201,11 +201,33 @@ function init()
   KEY1_hold = false
   KEY1_press = 0
   clear_all()
+
+  hardware_redraw = metro.init(
+    function()
+      draw_hardware()
+    end
+    , 1/30, -1)
+  hardware_redraw:start()
   
-  grid_redraw()
-  g:refresh()
+  grid_dirty = true
+  screen_dirty = true
   
   softcut.poll_start_phase()
+end
+
+function grid.add()
+  grid_dirty = true
+end
+
+function draw_hardware()
+  if grid_dirty then
+    grid_redraw()
+    grid_dirty = false
+  end
+  if screen_dirty then
+    redraw()
+    screen_dirty = false
+  end
 end
 
 phase = function(n, x)
@@ -224,8 +246,8 @@ phase = function(n, x)
       track[n].pos_grid = x
     end
   end
-  grid_redraw()
-  redraw()
+  grid_dirty = true
+  screen_dirty = true
 end
 
 function preset_pack(voice)
@@ -284,10 +306,8 @@ function preset_unpack(voice, set)
     softcut.position(2,preset_pool_2[set][3])
     params:set("speed_voice_2", preset_pool_2[set][4])
   end
-  redraw()
-  g:all(0)
-  grid_redraw()
-  g:refresh()
+  screen_dirty = true
+  grid_dirty = true
 end
 
 function warble()
@@ -366,12 +386,13 @@ function clear_all()
   crane2_redraw = 0
   c2 = math.random(4,15)
   restore_speed()
-  for i = 1,16 do
-    g:led(i,4,0)
-    g:led(i,8,0)
-  end
-  g:refresh()
-  redraw()
+  -- for i = 1,16 do
+  --   g:led(i,4,0)
+  --   g:led(i,8,0)
+  -- end
+  -- g:refresh()
+  grid_dirty = true
+  screen_dirty = true
   KEY3_hold = false
   params:set("offset",0)
 end
@@ -430,7 +451,7 @@ function window(voice,x)
   end
     softcut.loop_start(voice,track[voice].start_point)
     softcut.loop_end(voice,track[voice].end_point)
-    redraw()
+    screen_dirty = true
 end
 
 function record()
@@ -448,7 +469,7 @@ function record()
       softcut.level(i, 0)
     end
     crane_redraw = 1
-    redraw()
+    screen_dirty = true
     counter:start()
   -- if the buffer is clear and key 2 is pressed again:
   -- main recording will disable, loop points set
@@ -467,7 +488,7 @@ function record()
     softcut.loop_start(2,0)
     track[2].start_point = 0
     crane_redraw = 0
-    redraw()
+    screen_dirty = true
     rec_time = 0
     softcut.level(1,1)
     softcut.level(2,1)
@@ -481,7 +502,7 @@ function record()
     softcut.pre_level(1,math.abs(over_1-1))
     crane_redraw = 1
     crane2_redraw = 1
-    redraw()
+    screen_dirty = true
   -- if the buffer is NOT clear and key 2 is pressed again:
   -- overwrite/overdub behavior will disable
   elseif rec % 2 == 0 and clear == 0 and KEY1_press % 2 == 0 then
@@ -489,19 +510,19 @@ function record()
     softcut.pre_level(1,1)
     crane_redraw = 0
     crane2_redraw = 0
-    redraw()
+    screen_dirty = true
   elseif rec % 2 == 1 and clear == 0 and KEY1_press % 2 == 1 then
     softcut.rec_level(2,1)
     softcut.pre_level(2,math.abs(over_2-1))
     crane_redraw = 1
     crane2_redraw = 1
-    redraw()
+    screen_dirty = true
   elseif rec % 2 == 0 and clear == 0 and KEY1_press % 2 == 1 then
     softcut.rec_level(2,0)
     softcut.pre_level(2,1)
     crane_redraw = 0
     crane2_redraw = 0
-    redraw()
+    screen_dirty = true
   end
 end
 
@@ -582,13 +603,13 @@ function key(n,z)
       end
       crane_redraw = 0
       crane2_redraw = 0
-      redraw()
+      screen_dirty = true
     end
     KEY1_hold = true
-    redraw()
+    screen_dirty = true
   elseif n == 1 and z == 0 then
     KEY1_hold = false
-    redraw()
+    screen_dirty = true
   end
 end
 
@@ -599,25 +620,25 @@ function enc(n,d)
   if n == 3 and KEY1_press % 2 == 0 then
     track[1].end_point = util.clamp((track[1].end_point + d/10),0.0,60.0)
     softcut.loop_end(1,track[1].end_point)
-    redraw()
+    screen_dirty = true
 
   -- encoder 2: voice 1's loop start point
   elseif n == 2 and KEY1_press % 2 == 0 then
     track[1].start_point = util.clamp((track[1].start_point + d/10),0.0,60.0)
     softcut.loop_start(1,track[1].start_point)
-    redraw()
+    screen_dirty = true
 
 -- encoder 3: voice 2's loop end point
   elseif n == 3 and KEY1_press % 2 == 1 then
     track[2].end_point = util.clamp((track[2].end_point + d/10),0.0,60.0)
     softcut.loop_end(2,track[2].end_point)
-    redraw()
+    screen_dirty = true
 
 -- encoder 2: voice 2's loop start point
   elseif n == 2 and KEY1_press % 2 == 1 then
     track[2].start_point = util.clamp((track[2].start_point + d/10),0.0,60.0)
     softcut.loop_start(2,track[2].start_point)
-    redraw()
+    screen_dirty = true
 
   -- encoder 1: voice 1's overwrite/overdub amount
   -- 0 is full overdub
@@ -634,7 +655,7 @@ function enc(n,d)
           softcut.pre_level(2,math.abs(over_2-1))
         end
     end
-    redraw()
+    screen_dirty = true
   end
 end
 
@@ -755,7 +776,7 @@ g.key = function(x,y,z)
     elseif x == 15 then
       softcut.position(1,track[1].start_point)
     end
-    grid_redraw()
+    grid_dirty = true
   end
   if y == 5 and z == 1 then
     if x <=#speedlist_2 then
@@ -770,7 +791,7 @@ g.key = function(x,y,z)
     elseif x == 15 then
       softcut.position(2,track[2].start_point)
     end
-    grid_redraw()
+    grid_dirty = true
   end
 -- presets
   if y == 2 and z == 1 then
@@ -788,7 +809,7 @@ g.key = function(x,y,z)
       preset_count[1] = preset_count[1] + 1
       end
     end
-    grid_redraw()
+    grid_dirty = true
   end
   if y == 6 and z == 1 then
     if x < 14 and x < preset_count[2]+1 then
@@ -805,7 +826,7 @@ g.key = function(x,y,z)
       preset_count[2] = preset_count[2] + 1
       end
     end
-    grid_redraw()
+    grid_dirty = true
   end
 -- start point, end point, window
   if y == 3 or 7 then
