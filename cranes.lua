@@ -89,6 +89,7 @@ for i=1,4 do
   track[i].rec_limit = 0
   track[i].snapshot = {["partial_restore"] = false}
   track[i].snapshot.restore_times = {["beats"] = {1,2,4,8,16,32,64,128}, ["time"] = {1,2,4,8,16,32,64,128}, ["mode"] = "beats"}
+  track[i].snapshot.mod_index = 0
   track[i].reverse = false
 end
 
@@ -172,7 +173,7 @@ function init()
   -- dev
   for i = 1,4 do
     params:set("loop_sizing_voice_"..i, 2)
-    params:set("rec_trigger_voice_"..i, 3)
+    params:set("rec_trigger_voice_"..i, 2)
     track[i].end_point = softcut_offsets[i]+8
     softcut.recpre_slew_time(i,0.01)
     softcut.enable(i,1)
@@ -495,7 +496,7 @@ speedlist = {
   {-4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4},
   {-4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4}
 }
-over = {0,0,0,0}
+over = {0.0,0.0,0.0,0.0}
 ray = 0.0
 KEY3 = 1
 recording_crane = {0,0,0,0}
@@ -583,23 +584,33 @@ function enc(n,d)
     local _t = voice_on_screen
     -- encoder 3: voice 1's loop end point
     if n == 3 then
-      if (math.abs(d) == 1) then
-        d = d > 0 and 1/100 or -1/100
+      if rec[_t] == 1 and clear[_t] == 1 then
       else
-        d = d > 0 and 1/10 or -1/10
+        if (math.abs(d) == 1) then
+          d = d > 0 and 1/100 or -1/100
+        elseif (math.abs(d) < 3) then
+          d = d > 0 and 1/10 or -1/10
+        else
+          d = d > 0 and 1 or -1
+        end
+        track[_t].end_point = util.clamp((util.round(track[_t].end_point + d,0.01)), 0 + softcut_offsets[_t], 60 + softcut_offsets[_t])
+        softcut.loop_end(_t,track[_t].end_point)
       end
-      track[_t].end_point = util.clamp((util.round(track[_t].end_point + d,0.01)), 0 + softcut_offsets[_t], 60 + softcut_offsets[_t])
-      softcut.loop_end(_t,track[_t].end_point)
 
     -- encoder 2: voice 1's loop start point
     elseif n == 2 then
-      if (math.abs(d) == 1) then
-        d = d > 0 and 1/100 or -1/100
+      if rec[_t] == 1 and clear[_t] == 1 then
       else
-        d = d > 0 and 1/10 or -1/10
+        if (math.abs(d) == 1) then
+          d = d > 0 and 1/100 or -1/100
+        elseif (math.abs(d) < 3) then
+          d = d > 0 and 1/10 or -1/10
+        else
+          d = d > 0 and 1 or -1
+        end
+        track[_t].start_point = util.clamp((util.round(track[_t].start_point + d,0.01)), 0  + softcut_offsets[_t], 60  + softcut_offsets[_t])
+        softcut.loop_start(_t,track[_t].start_point)
       end
-      track[_t].start_point = util.clamp((util.round(track[_t].start_point + d,0.01)), 0  + softcut_offsets[_t], 60  + softcut_offsets[_t])
-      softcut.loop_start(_t,track[_t].start_point)
 
     -- encoder 1: voice 1's overwrite/overdub amount
     -- 0 is full overdub
@@ -856,6 +867,7 @@ elseif y == 5 and x >= 11 and x <= 16 then
 elseif y == 8 and x >= 13 and x <= 16 and z == 1 then
   local _t = x-12
   voice_on_screen = _t
+  page.flow.voice = _t
   screen_dirty = true
 end
 

@@ -1,6 +1,6 @@
 local lfos = {}
 
-lfos.NUM_LFOS = 8
+lfos.NUM_LFOS = 12
 lfos.LFO_MIN_TIME = 1 -- Secs
 lfos.LFO_MAX_TIME = 60 * 60 * 24
 lfos.LFO_UPDATE_FREQ = 128
@@ -10,30 +10,34 @@ lfos.lfo_progress = {}
 lfos.lfo_values = {}
 
 local lfo_rates = {1/16,1/8,1/4,5/16,1/3,3/8,1/2,3/4,1,1.5,2,3,4,6,8,16,32,64,128,256,512,1024}
-local scaled_output = {["vol_"] = {0,1,0.5}, ["pan_"] = {-1,1,0}}
+local scaled_output = {["vol_"] = {0,1,0.5}, ["pan_"] = {-1,1,0}, ["post_filter_fc_"] = {900,4000,1550}}
+local ivals = {["vol_"] = {1,4}, ["pan_"] = {5,8}, ["post_filter_fc_"] = {9,12}}
+local min_specs = {
+  ["vol_"] = {0,5,'lin',0.01,0,'',0.01}, --min, max, warp, step, default, units, quantum, wrap
+  ["pan_"] = {-1,1,'lin',0.01,-1,'',0.01},
+  ["post_filter_fc_"] = {20,12000,'exp',0.01,20,'',0.01}
+}
+local max_specs = {
+  ["vol_"] = {0,5,'lin',0.01,1,'',0.01}, --min, max, warp, step, default, units, quantum, wrap
+  ["pan_"] = {-1,1,'lin',0.01,1,'',0.01},
+  ["post_filter_fc_"] = {20,12000,'exp',0.01,12000,'',0.01}
+}
 
 -- lfos 1-4: vol_
 -- lfos 5-8: pan_
+-- lfos 9-12: post_filter_fc_
 
 function lfos.add_params(style)
-  local ivals = {["vol_"] = {1,4}, ["pan_"] = {5,8}}
   if style == "pan_" then
-    params:add_group("panning",36)
+    params:add_group("pan lfos",36)
   elseif style == "vol_" then
-    params:add_group("output level lfos",28)
+    params:add_group("output level lfos",36)
+  elseif style == "post_filter_fc_" then
+    params:add_group("filter cutoff lfos",36)
   end
   for i = ivals[style][1],ivals[style][2] do
     local _di = util.wrap(i,1,4)
-    if style == "pan_" then
-      local pan_defaults = {-1,1,0,0}
-      params:add_separator("voice ".._di)
-      params:add_control("pan_".._di,"pan",controlspec.new(-1,1,'lin',0.01,pan_defaults[_di],''))
-      params:set_action("pan_".._di, function(x) softcut.pan(_di, x) end)
-      params:add_control("pan_slew_".._di,"slew", controlspec.new(0, 20, "lin", 0.01, 1, ""))
-      params:set_action("pan_slew_".._di, function(x) softcut.pan_slew_time(_di, x) end)
-    elseif style == "vol_" then
-      params:add_separator("voice ".._di)
-    end
+    params:add_separator("voice ".._di)
     params:add_option("lfo_"..style..i,"lfo",{"off","on"},1)
     params:set_action("lfo_"..style..i,function(x)
       lfos.sync_lfos(i,style)
@@ -75,6 +79,18 @@ function lfos.add_params(style)
       end
     )
     params:add_option("lfo_shape_"..style..i, "lfo shape", {"sine","square","random"},1)
+    params:add{
+      type='control',
+      id="lfo_min_"..style..i,
+      name="lfo min",
+      controlspec=controlspec.new(min_specs[style][1],min_specs[style][2],min_specs[style][3],min_specs[style][4],min_specs[style][5],min_specs[style][6],min_specs[style][7])
+    }
+    params:add{
+      type='control',
+      id="lfo_max_"..style..i,
+      name="lfo max",
+      controlspec=controlspec.new(max_specs[style][1],max_specs[style][2],max_specs[style][3],max_specs[style][4],max_specs[style][5],max_specs[style][6],max_specs[style][7])
+    }
     params:add_trigger("lfo_reset_"..style..i, "reset lfo")
     params:set_action("lfo_reset_"..style..i, function(x) lfos.reset_phase(i) end)
     params:hide("lfo_free_"..style..i)
@@ -82,6 +98,8 @@ function lfos.add_params(style)
       vol_lfos_loaded = true
     elseif style == "pan_" then
       pan_lfos_loaded = true
+    elseif style == "post_filter_fc_" then
+      post_filter_fc_lfos_loaded = true
     end
   end
   lfos.reset_phase()
@@ -125,26 +143,34 @@ function lfos.lfo_update() -- 'pan_' or 'vol_'
   if vol_lfos_loaded then
     lfos.small("vol_")
   end
-  
+  if post_filter_fc_lfos_loaded then
+    lfos.small("post_filter_fc_")
+  end
 end
 
 function lfos.small(style)
   local delta = (1 / lfos.LFO_UPDATE_FREQ) * 2 * math.pi
-  local ivals = {["vol_"] = {1,4}, ["pan_"] = {5,8}}
   for i = ivals[style][1],ivals[style][2] do
     local _t = util.round(util.linlin(ivals[style][1],ivals[style][2],1,4,i))
     lfos.lfo_progress[i] = lfos.lfo_progress[i] + delta * lfos.lfo_freqs[i]
-    local value = util.linlin(-1,1,scaled_output[style][1],scaled_output[style][2],math.sin(lfos.lfo_progress[i]))
+    local min = params:get("lfo_min_"..style..i)
+    local max = params:get("lfo_max_"..style..i)
+    local mid = math.abs(min-max)/2
+    local value = util.linlin(-1,1,min,max,math.sin(lfos.lfo_progress[i]))
     if value ~= lfos.lfo_values[i] then
       lfos.lfo_values[i] = value
       if params:string("lfo_"..style..i) == "on" then
         if params:string("lfo_shape_"..style..i) == "sine" then
           params:set(style.._t, value)
         elseif params:string("lfo_shape_"..style..i) == "square" then
-          params:set(style.._t, value >= scaled_output[style][3] and scaled_output[style][2] or scaled_output[style][1])
+          params:set(style.._t, value >= mid and max or min)
         elseif params:string("lfo_shape_"..style..i) == "random" then
-          if value == scaled_output[style][1] or value == scaled_output[style][2] then
-            params:set(style.._t, math.random(scaled_output[style][1]*100,scaled_output[style][2]*100)/100)
+          if value == min or value == max then
+            if min < max then
+              params:set(style.._t, math.random(util.round(min*100),util.round(max*100))/100)
+            else
+              params:set(style.._t, math.random(util.round(max*100),util.round(min*100))/100)
+            end
           end
         end
       end

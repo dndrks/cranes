@@ -96,6 +96,17 @@ function _params.init()
 
   _lfos.add_params("vol_")
 
+  params:add_group("panning",12)
+  for i = 1,4 do
+    local _di = util.wrap(i,1,4)
+    local pan_defaults = {-1,1,0,0}
+    params:add_separator("voice ".._di)
+    params:add_control("pan_".._di,"pan",controlspec.new(-1,1,'lin',0.01,pan_defaults[_di],''))
+    params:set_action("pan_".._di, function(x) softcut.pan(_di, x) end)
+    params:add_control("pan_slew_".._di,"slew", controlspec.new(0, 20, "lin", 0.01, 1, ""))
+    params:set_action("pan_slew_".._di, function(x) softcut.pan_slew_time(_di, x) end)
+  end
+
   _lfos.add_params("pan_")
 
   params:add_group("filters",28)
@@ -103,7 +114,7 @@ function _params.init()
   -- local p = softcut.params() -- TODO VERIFY IF I NEED THIS?
   for i = 1,4 do
     params:add_separator("voice "..i)
-    params:add_control("post_filter_fc_"..i,"filter cutoff",controlspec.new(0,12000,'lin',0.01,12000,''))
+    params:add_control("post_filter_fc_"..i,"filter cutoff",controlspec.new(20,12000,'exp',0.01,12000,''))
     params:set_action("post_filter_fc_"..i, function(x) softcut.post_filter_fc(i,x) end)
     params:add_control("post_filter_lp_"..i,"lopass",controlspec.new(0,1,'lin',0,0,''))
     params:set_action("post_filter_lp_"..i, function(x) softcut.post_filter_lp(i,x) end)
@@ -117,12 +128,25 @@ function _params.init()
     params:set_action("post_filter_rq_"..i, function(x) softcut.post_filter_rq(i,x) end)
   end
 
+  _lfos.add_params("post_filter_fc_")
+
   chitter.init_params()
 
   params:add_group("recording",10)
+  params:add_separator("record trigger")
+  for i = 1,4 do
+    params:add_option("rec_trigger_voice_"..i, "voice ["..i.."]",{"free","clock","threshold"})
+    params:set_action("rec_trigger_voice_"..i,function(x)
+      if x == 1 and rec[i] == 0 and clear[i] == 1 then
+        
+      else
+        
+      end
+    end)
+  end
   params:add_separator("loop sizing")
   for i = 1,4 do
-    params:add_option("loop_sizing_voice_"..i, "voice ["..i.."]",{"manual (w/key)","dialed (w/encoders)"})
+    params:add_option("loop_sizing_voice_"..i, "voice ["..i.."]",{"manual (w/K2)","dialed (w/encoders)"})
     params:set_action("loop_sizing_voice_"..i,function(x)
       if x == 1 and rec[i] == 0 and clear[i] == 1 then
         -- reset to 60 seconds or max beat count
@@ -132,23 +156,15 @@ function _params.init()
     end)
   end
 
-  params:add_separator("record trigger")
-  for i = 1,4 do
-    params:add_option("rec_trigger_voice_"..i, "voice ["..i.."]",{"free","threshold","clock"})
-    params:set_action("rec_trigger_voice_"..i,function(x)
-      if x == 1 and rec[i] == 0 and clear[i] == 1 then
-        
-      else
-        
-      end
-    end)
-  end
-
-  params:add_group("misc",7)
+  params:add_group("misc",12)
   params:add_option("KEY3","KEY3", {"~~", "0.5", "-1", "1.5", "2"}, 1)
   params:set_action("KEY3", function(x) KEY3 = x end)
   params:add_number("voice_2_buffer","voice 2 buffer reference",1,2,2)
   params:set_action("voice_2_buffer", function(x) softcut.buffer(2,x) end)
+  params:add_separator("loop point quantization")
+  for i = 1,4 do
+    params:add_option("loop_quant_"..i,"voice ["..i.."]",{"seconds","beats"},1)
+  end
   params:add_separator("audio saving")
   for i = 1,4 do
     params:add_option("save_voice_"..i,"save voice ["..i.."] with PSET",{"no","yes"},2)
