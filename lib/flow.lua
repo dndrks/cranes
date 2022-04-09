@@ -111,7 +111,7 @@ function f_m.draw_menu()
         screen.text_right(string.upper(params:string("sync_clock_to_pattern_".._fm_.voice)))
       end
     elseif _fm_.main_sel == 2 then
-      local id = bank[_fm_.voice].snapshot_mod_index
+      local id = track[_fm_.voice].snapshot.focus
       if _fm_.scene_line_sel <= 6 then
         screen.move(55,0)
         screen.line(55,32)
@@ -126,19 +126,19 @@ function f_m.draw_menu()
         screen.text("~~ RESTORES ~~")
         screen.level(_fm_.scene_line_sel == 2 and 15 or 3)
         screen.move(64,28)
-        screen.text("rate: "..(bank[_fm_.voice].snapshot[id].restore.rate and (bank[_fm_.voice].snapshot[id].rate_ramp and "Y (RAMP)" or "Y (SNAP)") or "N"))
+        screen.text("rate: "..(snapshots[_t][id].restore.rate and (snapshots[_t][id].rate_ramp and "Y (RAMP)" or "Y (SNAP)") or "N"))
         screen.level(_fm_.scene_line_sel == 3 and 15 or 3)
         screen.move(64,36)
-        screen.text("loop start: "..(bank[_fm_.voice].snapshot[id].restore.start_point and "Y" or "N"))
+        screen.text("loop start: "..(snapshots[_t][id].restore.start_point and "Y" or "N"))
         screen.level(_fm_.scene_line_sel == 4 and 15 or 3)
         screen.move(64,44)
-        screen.text("loop end: "..(bank[_fm_.voice].snapshot[id].restore.end_point and "Y" or "N"))
+        screen.text("loop end: "..(snapshots[_t][id].restore.end_point and "Y" or "N"))
         screen.level(_fm_.scene_line_sel == 5 and 15 or 3)
         screen.move(64,52)
-        screen.text("level: "..(bank[_fm_.voice].snapshot[id].restore.level and "Y" or "N"))
+        screen.text("level: "..(snapshots[_t][id].restore.level and "Y" or "N"))
         screen.level(_fm_.scene_line_sel == 6 and 15 or 3)
         screen.move(64,60)
-        screen.text("filter: "..(bank[_fm_.voice].snapshot[id].restore.filter and "Y" or "N"))
+        screen.text("filter: "..(snapshots[_t][id].restore.filter and "Y" or "N"))
       end
       -- for i = 1,4 do
       --   for j = 1,4 do
@@ -268,31 +268,31 @@ function f_m.process_encoder(n,d)
       if n == 2 then
         _fm_.scene_line_sel = util.clamp(_fm_.scene_line_sel + d,1,6)
       elseif n == 3 then
-        local id = bank[_fm_.voice].snapshot_mod_index
+        local id = track[_fm_.voice].snapshot.focus
         if _fm_.scene_line_sel == 1 then
-          bank[_fm_.voice].snapshot_mod_index = util.clamp(bank[_fm_.voice].snapshot_mod_index + d,1,16)
+          track[_t].snapshot.focus = util.clamp(track[_t].snapshot.focus + d,1,16)
         elseif _fm_.scene_line_sel == 2 then
           if d > 0 then
-            if bank[_fm_.voice].snapshot[id].restore.rate and not bank[_fm_.voice].snapshot[id].rate_ramp then
-              bank[_fm_.voice].snapshot[id].rate_ramp = true
-            elseif not bank[_fm_.voice].snapshot[id].restore.rate then
-              bank[_fm_.voice].snapshot[id].restore.rate = true
+            if snapshots[_t][id].restore.rate and not snapshots[_t][id].rate_ramp then
+              snapshots[_t][id].rate_ramp = true
+            elseif not snapshots[_t][id].restore.rate then
+              snapshots[_t][id].restore.rate = true
             end
           else
-            if bank[_fm_.voice].snapshot[id].restore.rate and bank[_fm_.voice].snapshot[id].rate_ramp then
-              bank[_fm_.voice].snapshot[id].rate_ramp = false
-            elseif bank[_fm_.voice].snapshot[id].restore.rate and not bank[_fm_.voice].snapshot[id].rate_ramp then
-              bank[_fm_.voice].snapshot[id].restore.rate = false
+            if snapshots[_t][id].restore.rate and snapshots[_t][id].rate_ramp then
+              snapshots[_t][id].rate_ramp = false
+            elseif snapshots[_t][id].restore.rate and not snapshots[_t][id].rate_ramp then
+              snapshots[_t][id].restore.rate = false
             end
           end
         elseif _fm_.scene_line_sel == 3 then
-          bank[_fm_.voice].snapshot[id].restore.start_point = d > 0 and true or false
+          snapshots[_t][id].restore.start_point = d > 0 and true or false
         elseif _fm_.scene_line_sel == 4 then
-          bank[_fm_.voice].snapshot[id].restore.end_point = d > 0 and true or false
+          snapshots[_t][id].restore.end_point = d > 0 and true or false
         elseif _fm_.scene_line_sel == 5 then
-          bank[_fm_.voice].snapshot[id].restore.level = d > 0 and true or false
+          snapshots[_t][id].restore.level = d > 0 and true or false
         elseif _fm_.scene_line_sel == 6 then
-          bank[_fm_.voice].snapshot[id].restore.filter = d > 0 and true or false
+          snapshots[_t][id].restore.filter = d > 0 and true or false
         end
       end
     elseif _fm_.main_sel == 3 then

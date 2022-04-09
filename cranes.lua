@@ -36,6 +36,7 @@ _ca = include 'lib/clip'
 _lfos = include 'lib/lfos'
 _flow = include 'lib/flow'
 _song = include 'lib/song'
+_time = include 'lib/time'
 
 DATA_DIR = _path.data.."cranes/"
 AUDIO_DIR = _path.audio.."cranes/"
@@ -90,6 +91,7 @@ for i=1,4 do
   track[i].snapshot = {["partial_restore"] = false}
   track[i].snapshot.restore_times = {["beats"] = {1,2,4,8,16,32,64,128}, ["time"] = {1,2,4,8,16,32,64,128}, ["mode"] = "beats"}
   track[i].snapshot.mod_index = 0
+  track[i].snapshot.focus = 0
   track[i].reverse = false
 end
 
@@ -137,13 +139,13 @@ function init()
   _params.init()
   _flow.init()
   _song.init()
+  _time.init()
   
   counter = metro.init(count, 0.005, -1)
   rec_time = {0,0,0,0}
 
   KEY3_hold = false
   KEY1_hold = false
-  KEY1_press = 0
 
   voice_on_screen = 1
 
@@ -507,66 +509,57 @@ c2 = math.random(4,12)
 -- key hardware interaction
 function key(n,z)
   if not song_menu then
+    local _t = voice_on_screen
   
     -- KEY 2
     if n == 2 and z == 1 then
-      if voice_on_screen == 1 or voice_on_screen == 2 then
-        if voice_on_screen == 1 and clear[1] == 0 then
+      if _t == 1 or _t == 2 then
+        if _t == 1 and clear[1] == 0 then
           record(1)
-        elseif voice_on_screen == 2 and clear[2] == 0 then
+        elseif _t == 2 and clear[2] == 0 then
           record(2)
-        elseif (voice_on_screen == 1 or voice_on_screen == 2) and (clear[1] == 1 and clear[2] == 1) then
+        elseif (_t == 1 or _t == 2) and (clear[1] == 1 and clear[2] == 1) then
           record(1)
           record(2)
         end
       else
-        record(voice_on_screen)
+        record(_t)
       end
     end
     
     -- KEY 3
     -- all based on Parameter choice
     if n == 3 then
-      if z == 1 then
-        KEY3_hold = true
-          if KEY3 == 1 then
-            warble()
-          elseif KEY3 == 2 then
-            half_speed()
-          elseif KEY3 == 3 then
-            rev_speed()
-          elseif KEY3 == 4 then
-            oneandahalf_speed()
-          elseif KEY3 == 5 then
-            double_speed()
-          end
-      elseif z == 0 then
-        KEY3_hold = false
-        restore_speed()
+      if KEY1_hold then
+        _time.process_key(_t,n,z)
+      else
+        if z == 1 then
+          KEY3_hold = true
+            if KEY3 == 1 then
+              warble()
+            elseif KEY3 == 2 then
+              half_speed()
+            elseif KEY3 == 3 then
+              rev_speed()
+            elseif KEY3 == 4 then
+              oneandahalf_speed()
+            elseif KEY3 == 5 then
+              double_speed()
+            end
+        elseif z == 0 then
+          KEY3_hold = false
+          restore_speed()
+        end
+        softcut.rate(_t,ray*offset[_t])
       end
-      softcut.rate(voice_on_screen,ray*offset[voice_on_screen])
     end
 
     -- KEY 1
     -- hold key 1 + key 3 to clear the buffers
     if n == 1 and z == 1 and KEY3_hold == true then
-      clear_track(voice_on_screen)
+      clear_track(_t)
       KEY1_hold = false
     elseif n == 1 and z == 1 then
-      KEY1_press = KEY1_press + 1
-      -- if rec[voice_on_screen] % 2 == 1 then
-      --   rec[voice_on_screen] = 0
-      --   if KEY1_press % 2 == 1 then
-      --     softcut.rec_level(1,0)
-      --     softcut.pre_level(1,1)
-      --   elseif KEY1_press % 2 == 0 then
-      --     softcut.rec_level(2,0)
-      --     softcut.pre_level(2,1)
-      --   end
-      --   recording_crane[voice_on_screen] = 0
-      --   overdub_crane[voice_on_screen] = 0
-      --   screen_dirty = true
-      -- end
       KEY1_hold = true
     elseif n == 1 and z == 0 then
       KEY1_hold = false
@@ -580,36 +573,43 @@ end
 -- encoder hardware interaction
 function enc(n,d)
   if not song_menu then
-  -- local _t = KEY1_press % 2 == 0 and 1 or 2
     local _t = voice_on_screen
     -- encoder 3: voice 1's loop end point
     if n == 3 then
-      if rec[_t] == 1 and clear[_t] == 1 then
-      else
-        if (math.abs(d) == 1) then
-          d = d > 0 and 1/100 or -1/100
-        elseif (math.abs(d) < 3) then
-          d = d > 0 and 1/10 or -1/10
+      if not KEY1_hold then
+        if rec[_t] == 1 and clear[_t] == 1 then
         else
-          d = d > 0 and 1 or -1
+          if (math.abs(d) == 1) then
+            d = d > 0 and 1/100 or -1/100
+          elseif (math.abs(d) < 3) then
+            d = d > 0 and 1/10 or -1/10
+          else
+            d = d > 0 and 1 or -1
+          end
+          track[_t].end_point = util.clamp((util.round(track[_t].end_point + d,0.01)), 0 + softcut_offsets[_t], 60 + softcut_offsets[_t])
+          softcut.loop_end(_t,track[_t].end_point)
         end
-        track[_t].end_point = util.clamp((util.round(track[_t].end_point + d,0.01)), 0 + softcut_offsets[_t], 60 + softcut_offsets[_t])
-        softcut.loop_end(_t,track[_t].end_point)
+      else
+        _time.process_encoder(_t,n,d)
       end
 
     -- encoder 2: voice 1's loop start point
     elseif n == 2 then
-      if rec[_t] == 1 and clear[_t] == 1 then
-      else
-        if (math.abs(d) == 1) then
-          d = d > 0 and 1/100 or -1/100
-        elseif (math.abs(d) < 3) then
-          d = d > 0 and 1/10 or -1/10
+      if not KEY1_hold then
+        if rec[_t] == 1 and clear[_t] == 1 then
         else
-          d = d > 0 and 1 or -1
+          if (math.abs(d) == 1) then
+            d = d > 0 and 1/100 or -1/100
+          elseif (math.abs(d) < 3) then
+            d = d > 0 and 1/10 or -1/10
+          else
+            d = d > 0 and 1 or -1
+          end
+          track[_t].start_point = util.clamp((util.round(track[_t].start_point + d,0.01)), 0  + softcut_offsets[_t], 60  + softcut_offsets[_t])
+          softcut.loop_start(_t,track[_t].start_point)
         end
-        track[_t].start_point = util.clamp((util.round(track[_t].start_point + d,0.01)), 0  + softcut_offsets[_t], 60  + softcut_offsets[_t])
-        softcut.loop_start(_t,track[_t].start_point)
+      else
+        _time.process_encoder(_t,n,d)
       end
 
     -- encoder 1: voice 1's overwrite/overdub amount
@@ -639,27 +639,38 @@ function redraw()
     if KEY1_hold then
       screen.font_size(22)
       for i = 1,4 do
-        screen.move(10 + (20*i),35)
+        screen.move(10 + (20*i),42)
         screen.level(voice_on_screen == i and 15 or 4)
         screen.text_center(i)
       end
       screen.font_size(8)
-      screen.move(64,50)
-      screen.level(6)
+      screen.move(64,10)
+      screen.level(3)
       if voice_on_screen == 1 or voice_on_screen == 2 then
         screen.text_center("1 and 2 are")
-        screen.move(64,58)
+        screen.move(64,20)
         screen.text_center("linked, live loopers")
       else
         screen.text_center("3 and 4 are")
-        screen.move(64,58)
+        screen.move(64,20)
         screen.text_center("independent loopers/samplers")
       end
+      screen.move(0,55)
+      screen.level(15)
+      screen.text("quantize loop: ")
+      screen.level(_time.menu.sel == 1 and 15 or 4)
+      screen.move(screen.text_extents("quantize loop: ")+4,55)
+      screen.text(_time.menu.div_mult[voice_on_screen])
+      screen.move(screen.text_extents("quantize loop: ".._time.menu.div_mult[voice_on_screen]),55)
+      screen.level(_time.menu.sel == 2 and 15 or 4)
+      screen.text(_time.menu.div_options[_time.menu.div_selection[voice_on_screen]])
+      screen.move(screen.text_extents("quantize loop: ".._time.menu.div_mult[voice_on_screen].._time.menu.div_options[_time.menu.div_selection[voice_on_screen]])+5,55)
+      screen.level(15)
+      screen.text("(K3)")
     else
       screen.font_size(8)
       screen.level(15)
       screen.move(0,50)
-      -- local _t = KEY1_press % 2 == 0 and 1 or 2
       local _t = voice_on_screen
       screen.text("s".._t..": "..util.round(track[_t].start_point - softcut_offsets[_t],0.01).."s")
       screen.move(0,60)
@@ -833,7 +844,7 @@ elseif y >= 1 and y <= 4 and x >= 11 then
       x = x-10
       if tab.count(snapshots[_t][x]) == 0 then
         track[_t].snapshot.saver_clock = clock.run(snapshot.save_to_slot,_t,x)
-        -- track[_t].snapshot_mod_index = i
+        track[_t].snapshot.focus = x
       else
         -- local modifier, style = 0,"beats"
         -- if track[_t].restore_mod then
@@ -845,7 +856,7 @@ elseif y >= 1 and y <= 4 and x >= 11 then
         else
           try_it(_t,x,snapshot_mod.index,"sec")
         end
-        -- track[_t].snapshot_mod_index = i
+        track[_t].snapshot.focus = x
       end
     end
   else
@@ -871,51 +882,6 @@ elseif y == 8 and x >= 13 and x <= 16 and z == 1 then
   screen_dirty = true
 end
 
--- speed + direction
---   if (y == 1 or y == 5) and z == 1 then
---     local _t = y == 1 and 1 or 2
---     if x <= #speedlist[_t] then
---       params:set("speed_voice_".._t,x)
---     elseif x == 13 then
---       local other_track = _t == 1 and 2 or 1
---       softcut.position(_t,track[other_track].poll_position)
---     elseif x == 14 then
---       local other_track = _t == 1 and 2 or 1
---       track[_t].start_point = track[other_track].start_point
---       softcut.loop_start(_t,track[_t].start_point)
---       track[_t].end_point = track[other_track].end_point
---       softcut.loop_end(_t,track[_t].end_point)
---     elseif x == 15 then
---       softcut.position(_t,track[_t].start_point)
---     end
---     grid_dirty = true
--- -- snapshots
---   elseif (y == 2 or y == 6) then
---     local _t = y == 2 and 1 or 2
---     if z == 1 then
---       if x <= 8 then
---         if tab.count(snapshots[_t][x]) == 0 then
---           track[_t].snapshot.saver_clock = clock.run(snapshot.save_to_slot,_t,x)
---           -- track[_t].snapshot_mod_index = i
---         else
---           -- local modifier, style = 0,"beats"
---           -- if track[_t].restore_mod then
---           --   modifier =  track[_t].snapshot[i].restore_times[track[_t].snapshot[i].restore_times.mode][track[_t].restore_mod_index]
---           --   style = track[_t].snapshot[i].restore_times.mode
---           -- end
---           snapshot.unpack(_t,x)
---           -- track[_t].snapshot_mod_index = i
---         end
---       end
---     else
---       if track[_t].snapshot.saver_clock ~= nil then
---         clock.cancel(track[_t].snapshot.saver_clock)
---       end
---     end
---     grid_dirty = true
--- -- start point, end point, window
---   elseif (y == 3 or y == 7) and z == 1 then
---     window(y == 3 and 1 or 2, x)
   grid_dirty = true
 end
 
@@ -965,50 +931,6 @@ function grid_redraw()
   for i = 1,4 do
     g:led(i+12,8,voice_on_screen == i and 12 or 3)
   end
-  
-  -- for i=1, snapshot_count[2] do
-  --   g:led(i,6,5)
-  -- end
-  -- g:led(15,2,3)
-  -- g:led(16,2,9)
-  -- g:led(15,6,3)
-  -- g:led(16,6,9)
-  -- for i=13,15 do
-  --   g:led(i,1,5)
-  --   g:led(i,5,5)
-  -- end
 
-  -- if clear == 1 then
-  --   for i = 1,16 do
-  --     g:led(i,4,0)
-  --     g:led(i,8,0)
-  --   end
-  -- end
-  -- g:led(16,3,5)
-  -- g:led(15,3,9)
-  -- g:led(14,3,9)
-  -- g:led(13,3,5)
-  -- g:led(10,3,5)
-  -- g:led(9,3,9)
-  -- g:led(8,3,9)
-  -- g:led(7,3,5)
-  -- g:led(4,3,5)
-  -- g:led(3,3,9)
-  -- g:led(2,3,9)
-  -- g:led(1,3,5)
-  -- g:led(16,7,5)
-  -- g:led(15,7,9)
-  -- g:led(14,7,9)
-  -- g:led(13,7,5)
-  -- g:led(10,7,5)
-  -- g:led(9,7,9)
-  -- g:led(8,7,9)
-  -- g:led(7,7,5)
-  -- g:led(4,7,5)
-  -- g:led(3,7,9)
-  -- g:led(2,7,9)
-  -- g:led(1,7,5)
-  -- g:led(selected_snapshot[1],2,12)
-  -- g:led(selected_snapshot[2],6,12)
   g:refresh()
 end
