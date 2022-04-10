@@ -41,6 +41,11 @@ function lfos.add_params(style)
     params:add_option("lfo_"..style..i,"lfo",{"off","on"},1)
     params:set_action("lfo_"..style..i,function(x)
       lfos.sync_lfos(i,style)
+      if x == 1 then
+        local default_value = params.params[params.lookup[style..util.wrap(i,1,4)]].controlspec.default
+        -- local default_value = max_specs[style][5]
+        params:set(style..util.wrap(i,1,4),default_value)
+      end
     end)
     params:add_option("lfo_mode_"..style..i, "lfo mode", {"beats","free"},1)
     params:set_action("lfo_mode_"..style..i,

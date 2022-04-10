@@ -13,6 +13,12 @@ function snapshot.pack(voice,coll)
   snapshots[voice][coll].dry = params:get("post_filter_dry_"..voice)
   snapshots[voice][coll].rq = params:get("post_filter_rq_"..voice)
   snapshots[voice][coll].speed = tonumber(params:string("speed_voice_"..voice))
+  snapshots[voice][coll].lfo_vol_enabled = params:get("lfo_vol_"..voice)
+  snapshots[voice][coll].lfo_vol_mode = params:get("lfo_mode_vol_"..voice)
+  snapshots[voice][coll].lfo_vol_beats = params:get("lfo_beats_vol_"..voice)
+  snapshots[voice][coll].lfo_vol_shape = params:get("lfo_shape_vol_"..voice)
+  snapshots[voice][coll].lfo_vol_min = params:get("lfo_min_vol_"..voice)
+  snapshots[voice][coll].lfo_vol_max = params:get("lfo_max_vol_"..voice)
   selected_snapshot[voice] = coll
 end
 
@@ -36,6 +42,13 @@ function snapshot.unpack(voice, coll)
   end
   params:set("speed_voice_"..voice, snapshots[voice][coll].rate)
   -- TODO ADD LFO STATES TO SNAPSHOTS
+  params:set("lfo_vol_"..voice, snapshots[voice][coll].lfo_vol_enabled)
+  params:set("lfo_mode_vol_"..voice, snapshots[voice][coll].lfo_vol_mode)
+  params:set("lfo_beats_vol_"..voice, snapshots[voice][coll].lfo_vol_beats)
+  params:set("lfo_shape_vol_"..voice, snapshots[voice][coll].lfo_vol_shape)
+  params:set("lfo_min_vol_"..voice, snapshots[voice][coll].lfo_vol_min)
+  params:set("lfo_max_vol_"..voice, snapshots[voice][coll].lfo_vol_max)
+  
   if params:get("lfo_vol_"..voice) == "off" then
     params:set("vol_"..voice,snapshots[voice][coll].level)
   end
@@ -115,7 +128,8 @@ function try_it(_t,slot,sec,style)
   original_srcs.bp = params:get("post_filter_bp_".._t)
   original_srcs.dry = params:get("post_filter_dry_".._t)
   original_srcs.rq = params:get("post_filter_rq_".._t)
-  original_srcs.speed = tonumber(params:string("speed_voice_".._t))
+  -- original_srcs.speed = tonumber(params:string("speed_voice_".._t))
+  original_srcs.speed = get_total_pitch_offset(_t)
   track[_t].snapshot.fnl = snapshot.fnl(
     function(r_val)
       track[_t].snapshot.current_value = r_val
@@ -134,6 +148,7 @@ function try_it(_t,slot,sec,style)
       softcut.loop_end(_t,track[_t].end_point)
       -- softcut.position(_t,snapshots[_t][coll].poll_position)
       softcut.rate(_t,util.linlin(0,1,original_srcs.speed,snapshots[_t][slot].speed,r_val))
+      print(util.linlin(0,1,original_srcs.speed,snapshots[_t][slot].speed,r_val))
       screen_dirty = true
       grid_dirty = true
       if track[_t].snapshot.current_value ~= nil and util.round(track[_t].snapshot.current_value,0.001) == 1 then

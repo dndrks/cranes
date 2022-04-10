@@ -10,7 +10,7 @@ function _params.init()
     params:set_action("clip "..i.." sample", function(file) if file ~= _path.audio then _ca.load_sample(file,i) end end)
   end
 
-  params:add_group("rates",10)
+  params:add_group("rates",12)
 
   params:add_separator("speed")
   for i = 1,4 do
@@ -18,7 +18,8 @@ function _params.init()
     params:set("speed_voice_"..i, 9)
     params:set_action("speed_voice_"..i,
       function(x)
-        softcut.rate(i, speedlist[i][params:get("speed_voice_"..i)]*offset[i])
+        -- softcut.rate(i, speedlist[i][params:get("speed_voice_"..i)]*offset[i])
+        softcut.rate(i, get_total_pitch_offset(i))
         if x < 6 then
           if not track[i].reverse then track[i].reverse = true end
         elseif x > 6 then
@@ -30,15 +31,34 @@ function _params.init()
   end
   
   params:add_separator("offset")
+  
   for i = 1,4 do
-    params:add_number("offset_"..i, "offset voice "..i, -24,24,0, function(param) return (param:get().." st") end)
-    params:set_action("offset_"..i,
+    params:add_number("semitone_offset_"..i, "offset voice "..i, -24,24,0, function(param) return (param:get().." st") end)
+    params:set_action("semitone_offset_"..i,
       function(value)
         offset[i] = math.pow(0.5, -value / 12)
-        softcut.rate(i,speedlist[i][params:get("speed_voice_"..i)]*offset[i])
+        -- softcut.rate(i,speedlist[i][params:get("speed_voice_"..i)]*offset[i])
+        softcut.rate(i, get_total_pitch_offset(i))
       end
     )
   end
+
+  params:add_number("offset_all", "offset all voices", -24,24,0, function(param) return (param:get().." st") end)
+  params:set_action("offset_all",
+    function(value)
+      for i = 1,4 do
+        params:set("semitone_offset_"..i,value)
+      end
+    end
+  )
+
+  params:add_control("pitch_control","pitch control (global)",controlspec.new(-12,12,'lin',0,0,'%'))
+  params:set_action("pitch_control",function(x)
+    for i = 1,4 do
+      softcut.rate(i,get_total_pitch_offset(i))
+    end
+  end)
+
   params:add_group("levels",23)
   --
   params:add_separator("in")

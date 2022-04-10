@@ -120,7 +120,7 @@ function init()
   for i = 1, 4 do
     softcut.level(i,1.0)
     softcut.play(i, 0) -- TODO CONFIRM GOOD
-    softcut.rate(i, 1*offset[i])
+    softcut.rate(i, 1)
     softcut.loop_start(i, softcut_offsets[i])
     softcut.loop_end(i, 60+softcut_offsets[i])
     softcut.loop(i, 1)
@@ -179,6 +179,24 @@ function init()
     track[i].end_point = softcut_offsets[i]+8
     softcut.recpre_slew_time(i,0.01)
     softcut.enable(i,1)
+  end
+end
+
+function get_total_pitch_offset(_t)
+  local total_offset;
+  total_offset = params:get("semitone_offset_".._t)
+  local sample_rate_compensation;
+  if (48000/clip[_t].sample_rate) > 1 then
+    sample_rate_compensation = ((1200 * math.log(48000/clip[_t].sample_rate,2))/-100)
+  else
+    sample_rate_compensation = ((1200 * math.log(clip[_t].sample_rate/48000,2))/100)
+  end
+  total_offset = total_offset + sample_rate_compensation
+  total_offset = math.pow(0.5, -total_offset / 12) * speedlist[_t][params:get("speed_voice_".._t)]
+  if params:get("pitch_control") ~= 0 then
+    return (total_offset + (total_offset * (params:get("pitch_control")/100)))
+  else
+    return (total_offset)
   end
 end
 
@@ -262,7 +280,8 @@ function restore_speed()
   else
     softcut.rate_slew_time(voice_on_screen,0.6)
   end
-  softcut.rate(voice_on_screen,speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)]*offset[voice_on_screen])
+  -- softcut.rate(voice_on_screen,speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)]*offset[voice_on_screen])
+  softcut.rate(voice_on_screen, get_total_pitch_offset(voice_on_screen))
 end
 
 function clear_track(_t)
@@ -278,7 +297,8 @@ function clear_track(_t)
   softcut.play(_t, 0)
   track[_t].playing = false
   softcut.position(_t, scaled[_t][2])
-  softcut.rate(_t, 1*offset[_t])
+  -- softcut.rate(_t, 1*offset[_t])
+  softcut.rate(_t, 1) -- TODO CONFIRM THIS IS OK
   softcut.loop_start(_t, scaled[_t][2])
   softcut.loop_end(_t, scaled[_t][3])
   softcut.position(_t, scaled[_t][2])
@@ -307,7 +327,7 @@ function clear_track(_t)
   g:refresh()
   screen_dirty = true
   KEY3_hold = false
-  params:set("offset_".._t,0) -- TODO VERIFY IF NEEDED...
+  params:set("semitone_offset_".._t,0) -- TODO VERIFY IF NEEDED...
 end
 
 function window(voice,x)
@@ -407,7 +427,8 @@ function record_execute(_t,silent)
     softcut.position(_t,track[_t].start_point)
     softcut.rate_slew_time(_t,0.01)
     -- softcut.enable(_t, 1)
-    softcut.rate(_t, 1*offset[_t])
+    -- softcut.rate(_t, 1*offset[_t])
+    softcut.rate(_t, 1) -- TODO CONFIRM THIS IS OKAY
     softcut.play(_t, 1)
     -- softcut.rec(_t, 1)
     softcut.rec_level(_t,1)
@@ -440,7 +461,8 @@ function record_execute(_t,silent)
     screen_dirty = true
     rec_time[_t] = 0
     softcut.level(_t,params:get("vol_".._t))
-    softcut.rate(_t,speedlist[_t][params:get("speed_voice_".._t)]*offset[_t])
+    -- softcut.rate(_t,speedlist[_t][params:get("speed_voice_".._t)]*offset[_t])
+    softcut.rate(_t, get_total_pitch_offset(_t))
     if track[_t].end_point > track[_t].rec_limit then
       track[_t].rec_limit = track[_t].end_point
     end

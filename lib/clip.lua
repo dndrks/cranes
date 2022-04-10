@@ -61,6 +61,7 @@ function ca.load_sample(file,sample,summed)
     softcut.loop_start(sample,track[sample].start_point)
     softcut.loop_end(sample,track[sample].end_point)
     softcut.position(sample,track[sample].start_point)
+    softcut.rate(sample,get_total_pitch_offset(sample))
     softcut.play(sample, 1)
     chitter_stretch[sample].pos = track[sample].start_point
     clear[sample] = 0
