@@ -119,7 +119,7 @@ function init()
   
   for i = 1, 4 do
     softcut.level(i,1.0)
-    softcut.play(i, 0) -- TODO CONFIRM GOOD
+    softcut.play(i, 1) -- TODO CONFIRM GOOD
     softcut.rate(i, 1)
     softcut.loop_start(i, softcut_offsets[i])
     softcut.loop_end(i, 60+softcut_offsets[i])
@@ -294,7 +294,7 @@ function clear_track(_t)
   }
   softcut.rec_level(_t, 0)
   softcut.level(_t, 0)
-  softcut.play(_t, 0)
+  softcut.play(_t, 1)
   track[_t].playing = false
   softcut.position(_t, scaled[_t][2])
   -- softcut.rate(_t, 1*offset[_t])
@@ -535,17 +535,22 @@ function key(n,z)
   
     -- KEY 2
     if n == 2 and z == 1 then
-      if _t == 1 or _t == 2 then
-        if _t == 1 and clear[1] == 0 then
-          record(1)
-        elseif _t == 2 and clear[2] == 0 then
-          record(2)
-        elseif (_t == 1 or _t == 2) and (clear[1] == 1 and clear[2] == 1) then
-          record(1)
-          record(2)
+      if not KEY1_hold then
+        if _t == 1 or _t == 2 then
+          if _t == 1 and clear[1] == 0 then
+            record(1)
+          elseif _t == 2 and clear[2] == 0 then
+            record(2)
+          elseif (_t == 1 or _t == 2) and (clear[1] == 1 and clear[2] == 1) then
+            record(1)
+            record(2)
+          end
+        else
+          record(_t)
         end
       else
-        record(_t)
+        song_menu = true
+        KEY1_hold = false
       end
     end
     
@@ -827,6 +832,22 @@ function event_exec(e)
       end
     end
   end
+end
+
+function play_voice(_t)
+  -- softcut.enable(_t, 1)
+  track[_t].playing = true
+  softcut.poll_start_phase()
+  softcut.level(_t,params:get("vol_".._t))
+  softcut.loop_start(_t,track[_t].start_point)
+  softcut.loop_end(_t,track[_t].end_point)
+  softcut.position(_t,track[_t].start_point)
+  softcut.rate_slew_time(_t,0.01)
+  softcut.rate(_t, get_total_pitch_offset(_t)) -- TODO CONFIRM THIS IS OKAY
+  softcut.play(_t, 1)
+  chitter_stretch[_t].pos = track[_t].start_point
+  screen_dirty = true
+  grid_dirty = true
 end
 
 -- hardware: grid connect

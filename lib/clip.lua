@@ -53,17 +53,20 @@ function ca.load_sample(file,sample,summed)
     softcut.buffer_clear_region_channel(scaled[sample][1],scaled[sample][2],60)
     softcut.buffer_read_mono(file, 0, scaled[sample][2], clip[sample].sample_length + 0.05, im_ch, scaled[sample][1])
     track[sample].end_point = (clip[sample].sample_length-0.01) + softcut_offsets[sample]
-    softcut.enable(sample, 1)
-    track[sample].playing = true
-    softcut.poll_start_phase()
+    -- softcut.enable(sample, 1)
+    -- track[sample].playing = true
+    -- softcut.poll_start_phase()
     softcut.rec_level(sample,0)
-    softcut.level(sample, params:get("vol_"..sample))
-    softcut.loop_start(sample,track[sample].start_point)
-    softcut.loop_end(sample,track[sample].end_point)
-    softcut.position(sample,track[sample].start_point)
-    softcut.rate(sample,get_total_pitch_offset(sample))
-    softcut.play(sample, 1)
-    chitter_stretch[sample].pos = track[sample].start_point
+    -- softcut.level(sample, params:get("vol_"..sample))
+    -- softcut.loop_start(sample,track[sample].start_point)
+    -- softcut.loop_end(sample,track[sample].end_point)
+    -- softcut.position(sample,track[sample].start_point)
+    -- softcut.rate(sample,get_total_pitch_offset(sample))
+    -- softcut.play(sample, 1)
+    -- chitter_stretch[sample].pos = track[sample].start_point
+    if params:string("transport_start_play_voice_"..sample) == "no" then
+      play_voice(sample)
+    end
     clear[sample] = 0
     track[sample].rec_limit = 0
   end

@@ -136,7 +136,7 @@ function _params.init()
     params:add_separator("voice "..i)
     params:add_control("post_filter_fc_"..i,"filter cutoff",controlspec.new(20,12000,'exp',0.01,12000,''))
     params:set_action("post_filter_fc_"..i, function(x) softcut.post_filter_fc(i,x) end)
-    params:add_control("post_filter_lp_"..i,"lopass",controlspec.new(0,1,'lin',0,0,''))
+    params:add_control("post_filter_lp_"..i,"lopass",controlspec.new(0,1,'lin',0.01,0,''))
     params:set_action("post_filter_lp_"..i, function(x) softcut.post_filter_lp(i,x) end)
     params:add_control("post_filter_hp_"..i,"hipass",controlspec.new(0,1,'lin',0.01,0,''))
     params:set_action("post_filter_hp_"..i, function(x) softcut.post_filter_hp(i,x) end)
@@ -151,6 +151,12 @@ function _params.init()
   _lfos.add_params("post_filter_fc_")
 
   chitter.init_params()
+
+  params:add_group("playback",5)
+  params:add_separator("transport controls playback")
+  for i = 1,4 do
+    params:add_option("transport_start_play_voice_"..i, "voice ["..i.."]",{"no","yes"},1)
+  end
 
   params:add_group("recording",10)
   params:add_separator("record trigger")

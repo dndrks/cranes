@@ -358,7 +358,7 @@ function f_m.process_key(n,z)
     end
   elseif n == 2 and z == 1 then
     if _fm_.menu_layer == 1 then
-      menu = 1
+      song_menu = false
     elseif _fm_.menu_layer == 3 then
       if not _fm_.alt then
         _fm_.menu_layer = 1
