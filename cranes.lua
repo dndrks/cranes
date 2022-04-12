@@ -41,6 +41,7 @@ _time = include 'lib/time'
 DATA_DIR = _path.data.."cranes/"
 AUDIO_DIR = _path.audio.."cranes/"
 TRACKS = 2
+grid_alt = false
 
 function r()
   norns.script.load(norns.state.script)
@@ -292,6 +293,12 @@ function clear_track(_t)
     {1,softcut_offsets[3],60 + softcut_offsets[3]},
     {2,softcut_offsets[4],60 + softcut_offsets[4]},
   }
+  if track[_t].rec_on_clock ~= nil then
+    clock.cancel(track[_t].rec_on_clock)
+  end
+  if track[_t].rec_off_clock ~= nil then
+    clock.cancel(track[_t].rec_off_clock)
+  end
   softcut.rec_level(_t, 0)
   softcut.level(_t, 0)
   softcut.play(_t, 1)
@@ -302,7 +309,6 @@ function clear_track(_t)
   softcut.loop_start(_t, scaled[_t][2])
   softcut.loop_end(_t, scaled[_t][3])
   softcut.position(_t, scaled[_t][2])
-  softcut.enable(_t, 0)
   track[_t].rec_limit = 0
   softcut.buffer_clear_region_channel(scaled[_t][1],scaled[_t][2],60)
 
@@ -393,7 +399,7 @@ function record(_t,silent)
     if rec[_t] == 0 and clear[_t] == 1 then
       holding_crane[_t]= 1
       screen_dirty = true
-      clock.run(
+      track[_t].rec_on_clock = clock.run(
         function()
           -- clock.sync(4,-1/16)
           clock.sync(4)
@@ -480,7 +486,7 @@ function record_execute(_t,silent)
   if params:string("loop_sizing_voice_".._t) == "dialed (w/encoders)" then
     print("eval loop")
     if rec[_t] == 1 and clear[_t] == 1 then
-      clock.run(
+      track[_t].rec_off_clock = clock.run(
         function()
           clock.sleep(track[_t].end_point - track[_t].start_point)
           print("yep")
@@ -879,7 +885,11 @@ elseif y >= 1 and y <= 4 and x == 7 and z == 1 then
   end
 elseif y >= 1 and y <= 4 and x == 8 and z == 1 then
   local _t = y
-  record(_t)
+  if grid_alt then
+    clear_track(_t)
+  else
+    record(_t)
+  end
 elseif y >= 1 and y <= 4 and x >= 11 then
   local _t = y
   if z == 1 then
@@ -923,6 +933,8 @@ elseif y == 8 and x >= 13 and x <= 16 and z == 1 then
   voice_on_screen = _t
   page.flow.voice = _t
   screen_dirty = true
+elseif y == 8 and x == 9 then
+  grid_alt = z == 1 and true or false
 end
 
   grid_dirty = true
@@ -974,6 +986,8 @@ function grid_redraw()
   for i = 1,4 do
     g:led(i+12,8,voice_on_screen == i and 12 or 3)
   end
+
+  g:led(9,8,grid_alt and 15 or 5)
 
   g:refresh()
 end
