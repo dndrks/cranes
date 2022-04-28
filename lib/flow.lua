@@ -23,6 +23,8 @@ function f_m.init()
   _fm_ = page.flow
 end
 
+local snapshot_restore_params = {"rate","start_point","end_point","level","filter","lfo"}
+
 function f_m.index_to_grid_pos(val,columns,i)
   local x = math.fmod(val-1,columns)+1
   local y = math.modf((val-1)/columns)+1
@@ -111,42 +113,36 @@ function f_m.draw_menu()
         screen.text_right(string.upper(params:string("sync_clock_to_pattern_".._fm_.voice)))
       end
     elseif _fm_.main_sel == 2 then
-      local id = track[_fm_.voice].snapshot.focus
-      if _fm_.scene_line_sel <= 6 then
-        screen.move(55,0)
-        screen.line(55,32)
-        screen.move(57,0)
-        screen.line(57,32)
-        screen.stroke()
+      local _v = _fm_.voice
+      local id = track[_v].snapshot.focus > 0 and track[_v].snapshot.focus or 1
+      if _fm_.scene_line_sel <= 7 then
+        -- screen.move(55,0)
+        -- screen.line(55,32)
+        -- screen.move(57,0)
+        -- screen.line(57,32)
+        -- screen.stroke()
         screen.level(_fm_.scene_line_sel == 1 and 15 or 3)
-        screen.move(64,10)
+        screen.move(62,10)
         screen.text("SLOT: "..id)
-        screen.level(_fm_.scene_line_sel > 1 and 15 or 3)
-        screen.move(64,20)
-        screen.text("~~ RESTORES ~~")
         screen.level(_fm_.scene_line_sel == 2 and 15 or 3)
-        screen.move(64,28)
-        screen.text("rate: "..(snapshots[_t][id].restore.rate and (snapshots[_t][id].rate_ramp and "Y (RAMP)" or "Y (SNAP)") or "N"))
+        screen.move(62,20)
+        screen.text("rate: "..(snapshots[_v][id].restore.rate and (snapshots[_v][id].restore.rate_ramp and "Y (RAMP)" or "Y (SNAP)") or "N"))
         screen.level(_fm_.scene_line_sel == 3 and 15 or 3)
-        screen.move(64,36)
-        screen.text("loop start: "..(snapshots[_t][id].restore.start_point and "Y" or "N"))
+        screen.move(62,28)
+        screen.text("loop start: "..(snapshots[_v][id].restore.start_point and "Y" or "N"))
         screen.level(_fm_.scene_line_sel == 4 and 15 or 3)
-        screen.move(64,44)
-        screen.text("loop end: "..(snapshots[_t][id].restore.end_point and "Y" or "N"))
+        screen.move(62,36)
+        screen.text("loop end: "..(snapshots[_v][id].restore.end_point and "Y" or "N"))
         screen.level(_fm_.scene_line_sel == 5 and 15 or 3)
-        screen.move(64,52)
-        screen.text("level: "..(snapshots[_t][id].restore.level and "Y" or "N"))
+        screen.move(62,44)
+        screen.text("level: "..(snapshots[_v][id].restore.level and "Y" or "N"))
         screen.level(_fm_.scene_line_sel == 6 and 15 or 3)
-        screen.move(64,60)
-        screen.text("filter: "..(snapshots[_t][id].restore.filter and "Y" or "N"))
+        screen.move(62,52)
+        screen.text("filter: "..(snapshots[_v][id].restore.filter and "Y" or "N"))
+        screen.level(_fm_.scene_line_sel == 7 and 15 or 3)
+        screen.move(62,60)
+        screen.text("lfo: "..(snapshots[_v][id].restore.filter and "Y" or "N"))
       end
-      -- for i = 1,4 do
-      --   for j = 1,4 do
-      --     screen.level(_fm_.scene_pad[_fm_.voice] == (i*j) and 15 or 2)
-      --     f_m.draw_square(58+((j-1)*6),0+((i-1)*6))
-      --     screen.fill()
-      --   end
-      -- end
     elseif _fm_.main_sel == 3 then
       screen.level(15)
       screen.move(60,6)
@@ -266,33 +262,34 @@ function f_m.process_encoder(n,d)
       end
     elseif _fm_.main_sel == 2 then
       if n == 2 then
-        _fm_.scene_line_sel = util.clamp(_fm_.scene_line_sel + d,1,6)
+        _fm_.scene_line_sel = util.clamp(_fm_.scene_line_sel + d,1,7)
       elseif n == 3 then
-        local id = track[_fm_.voice].snapshot.focus
+        local _v = _fm_.voice
+        local id = track[_v].snapshot.focus
         if _fm_.scene_line_sel == 1 then
-          track[_t].snapshot.focus = util.clamp(track[_t].snapshot.focus + d,1,16)
+          track[_v].snapshot.focus = util.clamp(track[_v].snapshot.focus + d,1,8)
         elseif _fm_.scene_line_sel == 2 then
           if d > 0 then
-            if snapshots[_t][id].restore.rate and not snapshots[_t][id].rate_ramp then
-              snapshots[_t][id].rate_ramp = true
-            elseif not snapshots[_t][id].restore.rate then
-              snapshots[_t][id].restore.rate = true
+            if snapshots[_v][id].restore.rate and not snapshots[_v][id].restore.rate_ramp then
+              snapshots[_v][id].restore.rate_ramp = true
+            elseif not snapshots[_v][id].restore.rate then
+              snapshots[_v][id].restore.rate = true
             end
           else
-            if snapshots[_t][id].restore.rate and snapshots[_t][id].rate_ramp then
-              snapshots[_t][id].rate_ramp = false
-            elseif snapshots[_t][id].restore.rate and not snapshots[_t][id].rate_ramp then
-              snapshots[_t][id].restore.rate = false
+            if snapshots[_v][id].restore.rate and snapshots[_v][id].restore.rate_ramp then
+              snapshots[_v][id].restore.rate_ramp = false
+            elseif snapshots[_v][id].restore.rate and not snapshots[_v][id].restore.rate_ramp then
+              snapshots[_v][id].restore.rate = false
             end
           end
         elseif _fm_.scene_line_sel == 3 then
-          snapshots[_t][id].restore.start_point = d > 0 and true or false
+          snapshots[_v][id].restore.start_point = d > 0 and true or false
         elseif _fm_.scene_line_sel == 4 then
-          snapshots[_t][id].restore.end_point = d > 0 and true or false
+          snapshots[_v][id].restore.end_point = d > 0 and true or false
         elseif _fm_.scene_line_sel == 5 then
-          snapshots[_t][id].restore.level = d > 0 and true or false
+          snapshots[_v][id].restore.level = d > 0 and true or false
         elseif _fm_.scene_line_sel == 6 then
-          snapshots[_t][id].restore.filter = d > 0 and true or false
+          snapshots[_v][id].restore.filter = d > 0 and true or false
         end
       end
     elseif _fm_.main_sel == 3 then
@@ -353,6 +350,12 @@ function f_m.process_key(n,z)
           _song.add_line(_fm_.voice,_fm_.song_line[_fm_.voice])
         else
           _song.duplicate_line(_fm_.voice,_fm_.song_line[_fm_.voice])
+        end
+      elseif _fm_.main_sel == 2 then
+        if _fm_.alt then
+          if _fm_.scene_line_sel > 1 then
+            snapshot.seed_restore_state_to_all(_fm_.voice,track[_fm_.voice].snapshot.focus,snapshot_restore_params[_fm_.scene_line_sel-1])
+          end
         end
       end
     end

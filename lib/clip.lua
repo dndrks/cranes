@@ -5,7 +5,7 @@ function ca.init()
   for i = 1,4 do
     clip[i] = {}
     clip[i].length = 90
-    clip[i].sample_length = 60
+    clip[i].sample_length = global_duration
     clip[i].sample_rate = 48000
     clip[i].start_point = nil
     clip[i].end_point = nil
@@ -34,10 +34,10 @@ function ca.load_sample(file,sample,summed)
       print("sample rate needs to be 48khz!")
       print(len/48000, len/rate)
     end
-    if len/48000 < 60 then
+    if len/48000 < global_duration then
       clip[sample].sample_length = len/48000
     else
-      clip[sample].sample_length = 60
+      clip[sample].sample_length = global_duration
     end
     clip[sample].original_length = len/48000
     clip[sample].original_bpm = chitter.derive_bpm(clip[sample])
@@ -50,7 +50,7 @@ function ca.load_sample(file,sample,summed)
       {1,softcut_offsets[3],clip[sample].sample_length + 0.05 + softcut_offsets[3]},
       {2,softcut_offsets[4],clip[sample].sample_length + 0.05 + softcut_offsets[4]},
     }
-    softcut.buffer_clear_region_channel(scaled[sample][1],scaled[sample][2],60)
+    softcut.buffer_clear_region_channel(scaled[sample][1],scaled[sample][2],global_duration)
     softcut.buffer_read_mono(file, 0, scaled[sample][2], clip[sample].sample_length + 0.05, im_ch, scaled[sample][1])
     track[sample].end_point = (clip[sample].sample_length-0.01) + softcut_offsets[sample]
     -- softcut.enable(sample, 1)

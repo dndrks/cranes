@@ -37,6 +37,9 @@ _lfos = include 'lib/lfos'
 _flow = include 'lib/flow'
 _song = include 'lib/song'
 _time = include 'lib/time'
+pattern_time = require 'pattern_time'
+_pat = include 'lib/patterns'
+_loop = include 'lib/loop'
 
 DATA_DIR = _path.data.."cranes/"
 AUDIO_DIR = _path.audio.."cranes/"
@@ -63,15 +66,20 @@ clear = {1,1,1,1}
 offset = {1,1,1,1}
 pp = {0,0,0,0}
 
-snapshots = {
-  [1] = {},
-  [2] = {},
-  [3] = {},
-  [4] = {}
-}
+snapshots = {}
 for i = 1,4 do
+  snapshots[i] = {}
   for j = 1,12 do
     snapshots[i][j] = {}
+    snapshots[i][j].restore = {
+      rate = true,
+      rate_ramp = false,
+      start_point = true,
+      end_point = true,
+      level = true,
+      filter = true,
+      lfo = true
+    }
   end
 end
 -- snapshots[voice][coll].start_point = track[voice].start_point
@@ -80,12 +88,13 @@ selected_snapshot = {0,0,0,0}
 snapshot_mod = {["index"] = 0, ["held"] = {false,false,false,false,false,false}}
 
 softcut_offsets = {0,0,100,100}
+global_duration = 60
 
 track = {}
 for i=1,4 do
   track[i] = {}
   track[i].start_point = 0 + softcut_offsets[i]
-  track[i].end_point = 60 + softcut_offsets[i]
+  track[i].end_point = global_duration + softcut_offsets[i]
   track[i].poll_position = 0 + softcut_offsets[i]
   track[i].pos_grid = -1
   track[i].rec_limit = 0
@@ -100,7 +109,12 @@ distance = {0,0}
 quantize_events = {}
 quantize = 1
 
+function grid.add(dev)
+  grid_dirty = true
+end
+
 function init()
+  _pat.init()
   g = grid.connect()
 
   softcut.buffer_clear()
@@ -123,7 +137,7 @@ function init()
     softcut.play(i, 1) -- TODO CONFIRM GOOD
     softcut.rate(i, 1)
     softcut.loop_start(i, softcut_offsets[i])
-    softcut.loop_end(i, 60+softcut_offsets[i])
+    softcut.loop_end(i, global_duration+softcut_offsets[i])
     softcut.loop(i, 1)
     softcut.fade_time(i, 0.01)
     softcut.rec(i, 1) -- TODO CONFIRM GOOD
@@ -151,7 +165,7 @@ function init()
   voice_on_screen = 1
 
   for i = 1,4 do
-    clear_track(i)
+    _loop.clear_track(i)
   end
 
   hardware_redraw = metro.init(
@@ -285,238 +299,6 @@ function restore_speed()
   softcut.rate(voice_on_screen, get_total_pitch_offset(voice_on_screen))
 end
 
-function clear_track(_t)
-  local scaled = {
-    -- {buffer, start, end}
-    {1,0,60},
-    {params:get("voice_2_buffer"),0,60},
-    {1,softcut_offsets[3],60 + softcut_offsets[3]},
-    {2,softcut_offsets[4],60 + softcut_offsets[4]},
-  }
-  if track[_t].rec_on_clock ~= nil then
-    clock.cancel(track[_t].rec_on_clock)
-  end
-  if track[_t].rec_off_clock ~= nil then
-    clock.cancel(track[_t].rec_off_clock)
-  end
-  softcut.rec_level(_t, 0)
-  softcut.level(_t, 0)
-  softcut.play(_t, 1)
-  track[_t].playing = false
-  softcut.position(_t, scaled[_t][2])
-  -- softcut.rate(_t, 1*offset[_t])
-  softcut.rate(_t, 1) -- TODO CONFIRM THIS IS OK
-  softcut.loop_start(_t, scaled[_t][2])
-  softcut.loop_end(_t, scaled[_t][3])
-  softcut.position(_t, scaled[_t][2])
-  track[_t].rec_limit = 0
-  softcut.buffer_clear_region_channel(scaled[_t][1],scaled[_t][2],60)
-
-  ray = speedlist[1][params:get("speed_voice_1")] -- TODO FIX
-  
-  track[_t].start_point = scaled[_t][2]
-  track[_t].end_point = scaled[_t][3]
-
-  clear[_t] = 1
-  rec_time[_t] = 0
-  rec[_t] = 0
-  recording_crane[_t] = 0
-  overdub_crane[_t] = 0
-
-  c2 = math.random(4,15) -- TODO FIX
-  restore_speed()
-  -- TODO FIX:
-  -- for i = 1,16 do
-  --   g:led(i,4,0)
-  --   g:led(i,8,0)
-  -- end
-  g:refresh()
-  screen_dirty = true
-  KEY3_hold = false
-  params:set("semitone_offset_".._t,0) -- TODO VERIFY IF NEEDED...
-end
-
-function window(voice,x)
-  if x == 1 then
-    if track[voice].start_point - 0.01 < 0 then
-      track[voice].start_point = 0
-    else
-      track[voice].start_point = track[voice].start_point - 0.01
-    end
-  elseif x == 2 then
-    if track[voice].start_point - 0.1 < 0 then
-      track[voice].start_point = 0
-    else
-      track[voice].start_point = track[voice].start_point - 0.1
-    end
-  elseif x == 3 then
-    track[voice].start_point = track[voice].start_point + 0.1
-  elseif x == 4 then
-    track[voice].start_point = track[voice].start_point + 0.01
-  elseif x == 8 and track[voice].start_point > 0.009 then
-    distance[voice] = math.abs(track[voice].start_point - track[voice].end_point)
-    if track[voice].start_point < distance[voice] then
-      track[voice].start_point = 0
-    else
-      track[voice].start_point = track[voice].start_point - distance[voice]
-    end
-    track[voice].end_point = track[voice].end_point - distance[voice]
-  elseif x == 7 and track[voice].start_point > 0.009 then
-    track[voice].start_point = track[voice].start_point - 0.01
-    track[voice].end_point = track[voice].end_point - 0.01
-  elseif x == 10 then
-    track[voice].start_point = track[voice].start_point + 0.01
-    track[voice].end_point = track[voice].end_point + 0.01
-  elseif x == 9 then
-    distance[voice] = math.abs(track[voice].start_point - track[voice].end_point)
-    track[voice].start_point = track[voice].start_point + distance[voice]
-    track[voice].end_point = track[voice].end_point + distance[voice]
-  elseif x == 13 then
-    if track[voice].end_point - 0.1 < 0 then
-      track[voice].end_point = 0
-    else
-      track[voice].end_point = track[voice].end_point - 0.01
-    end
-  elseif x == 14 then
-    if track[voice].end_point - 0.1 < 0 then
-      track[voice].end_point = 0
-    else
-      track[voice].end_point = track[voice].end_point - 0.1
-    end
-  elseif x == 15 then
-    track[voice].end_point = track[voice].end_point + 0.1
-  elseif x == 16 then
-    track[voice].end_point = track[voice].end_point + 0.01
-  end
-  softcut.loop_start(voice,track[voice].start_point)
-  softcut.loop_end(voice,track[voice].end_point)
-  screen_dirty = true
-end
-
-function record(_t,silent)
-
-  if params:string("rec_trigger_voice_".._t) == "clock" then
-    if rec[_t] == 0 and clear[_t] == 1 then
-      holding_crane[_t]= 1
-      screen_dirty = true
-      track[_t].rec_on_clock = clock.run(
-        function()
-          -- clock.sync(4,-1/16)
-          clock.sync(4)
-          record_execute(_t,silent)
-          holding_crane[_t] = 0
-        end
-      )
-    end
-  else
-    record_execute(_t,silent)
-    holding_crane[_t] = 0
-  end
-
-end
-
-function record_execute(_t,silent)
-  if not silent then
-    rec[_t] = rec[_t] == 0 and 1 or 0
-  end
-  -- if the buffer is clear and recording is enabled:
-  -- main recording will enable
-  if rec[_t] == 1 and clear[_t] == 1 then
-    local scaled = {
-      -- {buffer, start, end}
-      {1,0},
-      {params:get("voice_2_buffer"),0},
-      {1,softcut_offsets[3]},
-      {2,softcut_offsets[4]}
-    }
-    -- softcut.buffer_clear_region_channel(scaled[_t][1],scaled[_t][2],60)
-    softcut.position(_t,track[_t].start_point)
-    softcut.rate_slew_time(_t,0.01)
-    -- softcut.enable(_t, 1)
-    -- softcut.rate(_t, 1*offset[_t])
-    softcut.rate(_t, 1) -- TODO CONFIRM THIS IS OKAY
-    softcut.play(_t, 1)
-    -- softcut.rec(_t, 1)
-    softcut.rec_level(_t,1)
-    softcut.level(_t, 0)
-    softcut.poll_start_phase()
-    track[_t].playing = true
-    recording_crane[_t] = 1
-    screen_dirty = true
-    counter:start()
-  -- if the buffer is clear and key 2 is pressed again:
-  -- main recording will disable, loop points set
-  elseif rec[_t] == 0 and clear[_t] == 1 then
-    clear[_t] = 0
-    softcut.position(_t,track[_t].start_point)
-    softcut.rec_level(_t,0)
-    counter:stop()
-    softcut.poll_start_phase()
-    track[_t].playing = true
-    -- track[_t].end_point = util.round(softcut_offsets[_t] + rec_time[_t],0.01)
-    if params:string("loop_sizing_voice_".._t) == "dialed (w/encoders)" then
-      -- track[_t].end_point = (softcut_offsets[_t] + rec_time[_t])
-    else
-      track[_t].end_point = (softcut_offsets[_t] + rec_time[_t])
-    end
-    print(_t,track[_t].end_point)
-    softcut.loop_end(_t,track[_t].end_point)
-    softcut.loop_start(_t,track[_t].start_point)
-    -- track[2].start_point = 0
-    recording_crane[_t] = 0
-    screen_dirty = true
-    rec_time[_t] = 0
-    softcut.level(_t,params:get("vol_".._t))
-    -- softcut.rate(_t,speedlist[_t][params:get("speed_voice_".._t)]*offset[_t])
-    softcut.rate(_t, get_total_pitch_offset(_t))
-    if track[_t].end_point > track[_t].rec_limit then
-      track[_t].rec_limit = track[_t].end_point
-    end
-  end
-  -- if the buffer is NOT clear and key 2 is pressed:
-  -- overwrite/overdub behavior will enable
-  if rec[_t] == 1 and clear[_t] == 0 then
-    toggle_overdub(_t,"on")
-  -- if the buffer is NOT clear and key 2 is pressed again:
-  -- overwrite/overdub behavior will disable
-  elseif rec[_t] == 0 and clear[_t] == 0 then
-    toggle_overdub(_t,"off")
-  end
-
-  if params:string("loop_sizing_voice_".._t) == "dialed (w/encoders)" then
-    print("eval loop")
-    if rec[_t] == 1 and clear[_t] == 1 then
-      track[_t].rec_off_clock = clock.run(
-        function()
-          clock.sleep(track[_t].end_point - track[_t].start_point)
-          print("yep")
-          record_execute(_t)
-        end
-      )
-    end
-  end
-end
-
-function toggle_overdub(_t,state)
-  if state == "on" then
-    rec[_t] = 1
-    softcut.rec_level(_t,1)
-    softcut.pre_level(_t,math.abs(over[_t]-1))
-    recording_crane[_t] = 1
-    overdub_crane[_t] = 1
-    -- if track[_t].end_point > track[_t].rec_limit then
-    --   track[_t].rec_limit = track[_t].end_point
-    -- end
-  else
-    rec[_t] = 0
-    softcut.rec_level(_t,0)
-    softcut.pre_level(_t,1)
-    recording_crane[_t] = 0
-    overdub_crane[_t] = 0
-  end
-  screen_dirty = true
-end
-
 -- variable dump
 down_time = 0
 hold_time = 0
@@ -544,15 +326,15 @@ function key(n,z)
       if not KEY1_hold then
         if _t == 1 or _t == 2 then
           if _t == 1 and clear[1] == 0 then
-            record(1)
+            _loop.queue_record(1)
           elseif _t == 2 and clear[2] == 0 then
-            record(2)
+            _loop.queue_record(2)
           elseif (_t == 1 or _t == 2) and (clear[1] == 1 and clear[2] == 1) then
-            record(1)
-            record(2)
+            _loop.queue_record(1)
+            _loop.queue_record(2)
           end
         else
-          record(_t)
+          _loop.queue_record(_t)
         end
       else
         song_menu = true
@@ -590,7 +372,7 @@ function key(n,z)
     -- KEY 1
     -- hold key 1 + key 3 to clear the buffers
     if n == 1 and z == 1 and KEY3_hold == true then
-      clear_track(_t)
+      _loop.clear_track(_t)
       KEY1_hold = false
     elseif n == 1 and z == 1 then
       KEY1_hold = true
@@ -619,7 +401,7 @@ function enc(n,d)
           else
             d = d > 0 and 1 or -1
           end
-          track[_t].end_point = util.clamp((util.round(track[_t].end_point + d,0.01)), 0 + softcut_offsets[_t], 60 + softcut_offsets[_t])
+          track[_t].end_point = util.clamp((util.round(track[_t].end_point + d,0.01)), 0 + softcut_offsets[_t], global_duration + softcut_offsets[_t])
           softcut.loop_end(_t,track[_t].end_point)
         end
       else
@@ -638,7 +420,7 @@ function enc(n,d)
           else
             d = d > 0 and 1 or -1
           end
-          track[_t].start_point = util.clamp((util.round(track[_t].start_point + d,0.01)), 0  + softcut_offsets[_t], 60  + softcut_offsets[_t])
+          track[_t].start_point = util.clamp((util.round(track[_t].start_point + d,0.01)), 0  + softcut_offsets[_t], global_duration  + softcut_offsets[_t])
           softcut.loop_start(_t,track[_t].start_point)
         end
       else
@@ -779,11 +561,11 @@ function crane2()
   screen.aa(1)
   screen.line_width(0.5)
   if track[1].poll_position < 10 then
-    screen.move(100-(track[1].poll_position * 3),60-(track[2].poll_position))
+    screen.move(100-(track[1].poll_position * 3),global_duration-(track[2].poll_position))
   elseif track[1].poll_position < 40 then
-    screen.move(100-(track[1].poll_position * 2),60-(track[2].poll_position))
+    screen.move(100-(track[1].poll_position * 2),global_duration-(track[2].poll_position))
   else
-    screen.move(100-(track[1].poll_position),60-(track[2].poll_position))
+    screen.move(100-(track[1].poll_position),global_duration-(track[2].poll_position))
   end
   if c2 > 30 then
     screen.text(" ^ ^ ")
@@ -803,7 +585,10 @@ function event(e)
   if quantize == 1 then
     table.insert(quantize_events,e)
   else
-    -- if e.section ~= PATTERN then event_record(e) end
+    -- if e.section ~= PATTERN then event__rec.record(e) end
+    if e.section == "SNAP" then
+      _pat.record_grid_press(e)
+    end
     event_exec(e)
   end
 end
@@ -818,7 +603,10 @@ end
 function event_q_clock()
   if #quantize_events > 0 then
     for k,e in pairs(quantize_events) do
-      -- if e.t ~= ePATTERN then event_record(e) end
+      -- if e.t ~= ePATTERN then event__rec.record(e) end
+      if e.section == "SNAP" then
+        _pat.record_grid_press(e)
+      end
       event_exec(e)
     end
     quantize_events = {}
@@ -827,7 +615,8 @@ end
 
 function event_exec(e)
   local _t = e.voice
-  if e.section == CUT then
+  -- tab.print(e)
+  if e.section == "CUT" then
     if rec[_t] == 0 or (rec[_t] == 1 and clear[_t] == 0) then
       local _block = (track[_t].end_point - track[_t].start_point) / 8
       local _cutposition = _block * (e.x-1) + softcut_offsets[_t]
@@ -836,6 +625,12 @@ function event_exec(e)
       else
         softcut.position(_t,_cutposition)
       end
+    end
+  elseif e.section == "SNAP" then
+    if snapshot_mod.index == 0 then
+      snapshot.unpack(_t,e.x)
+    else
+      try_it(_t,e.x,snapshot_mod.index,"time")
     end
   end
 end
@@ -864,7 +659,7 @@ g.key = function(x,y,z)
 if y >= 5 and y <= 8 and x <= 8 and z == 1 then
   -- local e={t=ePATTERN,i=i,action="rec_stop"} event(e)
   local _t = y-4
-  local _e = {section = CUT, voice = _t, x = x, y = y, z = z}
+  local _e = {section = "CUT", voice = _t, x = x, y = y, z = z}
   event(_e)
 elseif y >= 1 and y <= 4 and x <=6 and z == 1 then
   local _t = y
@@ -886,16 +681,16 @@ elseif y >= 1 and y <= 4 and x == 7 and z == 1 then
 elseif y >= 1 and y <= 4 and x == 8 and z == 1 then
   local _t = y
   if grid_alt then
-    clear_track(_t)
+    _loop.clear_track(_t)
   else
-    record(_t)
+    _loop.queue_record(_t)
   end
 elseif y >= 1 and y <= 4 and x >= 11 then
   local _t = y
   if z == 1 then
     if x >= 11 then
       x = x-10
-      if tab.count(snapshots[_t][x]) == 0 then
+      if tab.count(snapshots[_t][x]) < 2 then
         track[_t].snapshot.saver_clock = clock.run(snapshot.save_to_slot,_t,x)
         track[_t].snapshot.focus = x
       else
@@ -904,10 +699,17 @@ elseif y >= 1 and y <= 4 and x >= 11 then
         --   modifier =  track[_t].snapshot[i].restore_times[track[_t].snapshot[i].restore_times.mode][track[_t].restore_mod_index]
         --   style = track[_t].snapshot[i].restore_times.mode
         -- end
-        if snapshot_mod.index == 0 then
-          snapshot.unpack(_t,x)
+        if grid_alt then
+          track[_t].snapshot.saver_clock = clock.run(snapshot.save_to_slot,_t,x)
         else
-          try_it(_t,x,snapshot_mod.index,"sec")
+          local _e = {section = "SNAP", voice = _t, x = x}
+          -- tab.print(_e)
+          event(_e)
+          -- if snapshot_mod.index == 0 then
+          --   snapshot.unpack(_t,x)
+          -- else
+          --   try_it(_t,x,snapshot_mod.index,"time")
+          -- end
         end
         track[_t].snapshot.focus = x
       end
@@ -947,7 +749,7 @@ function grid_redraw()
   for i = 11,16 do
     for j = 1,4 do
       local _t = j
-      g:led(i,j,tab.count(snapshots[_t][i-10]) > 0 and 6 or 3)
+      g:led(i,j,tab.count(snapshots[_t][i-10]) > 1 and 6 or 3)
       if selected_snapshot[_t] ~= 0 then
         g:led(selected_snapshot[_t]+10,j,12)
       end

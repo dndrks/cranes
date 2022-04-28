@@ -43,64 +43,33 @@ end
 song.check_step = function(i)
   local _current = song_atoms[i].current
   for k,v in pairs(song_atoms[i].lane[_current]) do
-    if k ~= "beats" and k ~= "snapshot_restore_mod_index" and k ~= "snapshot" and song_atoms[i].runner == 1 then
-      -- -- print("new step"..clock.get_beats(),k) -- this goes negative for Link...√
-      -- if song_atoms[i].lane[_current][k].target > 0 then
-      --   print("song loadup"..clock.get_beats())
-      --   load_pattern_from_table(song_atoms[i].lane[_current][k].target+(8*(i-1)),i)
-      --   print(type_of_pattern_loaded[i])
-      --   if type_of_pattern_loaded[i] == "arp" then
-      --     if grid_pat[i].play then
-      --       stop_pattern(grid_pat[i])
-      --     end
-      --     -- params:set("euclid_mute_"..i, 1)
-      --     params:set("euclid_pulses_"..i, 0)
-      --     print(clock.get_beats(), "loading arp from song")
-      --     arps.toggle("start",i)
-      --   elseif type_of_pattern_loaded[i] == "grid" then
-      --     arps.toggle("stop",i)
-      --     params:set("euclid_pulses_"..i, 0)
-      --     grid_pat[i]:start()
-      --   elseif type_of_pattern_loaded[i] == "euclid" then
-      --     arps.toggle("stop",i)
-      --     if grid_pat[i].play then
-      --       stop_pattern(grid_pat[i])
-      --     end
-      --   end
-      -- elseif song_atoms[i].lane[_current][k].target == 0 then
-      -- elseif song_atoms[i].lane[_current][k].target == -1 then
-      --   print("when does this equal -1??")
-      --   if type_of_pattern_loaded[i] == "grid" then
-      --     -- grid_pat[i]:stop()
-      --     stop_pattern(grid_pat[i])
-      --     print("stopping grid "..clock.get_beats())
-      --   elseif type_of_pattern_loaded[i] == "arp" then
-      --     arp[i].pause = true
-      --     arp[i].playing = false
-      --   elseif type_of_pattern_loaded[i] == "euclid" then
-      --     print("TODO: STOP EUCLID")
-      --   end
-      -- end
-    elseif k == "snapshot" and song_atoms[i].runner == 1 then
+    if k == "snapshot" and song_atoms[i].runner == 1 then
       local modifier, style = 0,"beats"
       local shot = song_atoms[i].lane[_current][k].target
-      if shot > 0 then
+      if shot > 0 and tab.count(snapshots[i][shot]) > 1 then
         if song_atoms[i].lane[_current].snapshot_restore_mod_index > 0 then
           modifier =  track[i].snapshot.restore_times[track[i].snapshot.restore_times.mode][song_atoms[i].lane[_current].snapshot_restore_mod_index]
+          print("try_it: "..shot,modifier)
+          try_it(i,shot,modifier,"time")
         else
-          modifier = 0
+          -- modifier = 0
+          snapshot.funnel_done_action(i,shot)
         end
-        style = track[i].snapshot.restore_times.mode
+        -- style = track[i].snapshot.restore_times.mode
         -- _snap.restore(i,shot,modifier,style)
-        try_it(i,shot,modifier,style)
+        
       elseif shot == 0 then
       elseif shot == -1 then
       end
     end
   end
+  screen_dirty = true
 end
 
 song.start = function()
+  if song_atoms.clock ~= nil then
+    clock.cancel(song_atoms.clock)
+  end
   for i = 1,4 do
     song_atoms[i].runner = 1
     song_atoms[i].current = song_atoms[i].start_point

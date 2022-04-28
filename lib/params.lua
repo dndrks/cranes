@@ -182,6 +182,35 @@ function _params.init()
     end)
   end
 
+  params:add_group("patterns", 13)
+  params:add_separator("recording start/stop")
+  for i = 1,4 do
+    params:add_option("pattern_rec_mode_"..i, "voice ["..i.."]", {'free','duration','clocked'}, 1)
+    params:add_option("pattern_rec_start_"..i, "   start at", {"next beat","next bar"}, 1)
+    params:add_number("pattern_rec_duration_"..i, "   duration", 1, 128, 1, function(param) return (param:get().." beats") end)
+    params:set_action("pattern_rec_mode_"..i,
+      function(x)
+        if x == 1 then
+          params:hide("pattern_rec_start_"..i)
+          params:hide("pattern_rec_duration_"..i)
+        elseif x == 2 then
+          params:hide("pattern_rec_start_"..i)
+          params:show("pattern_rec_duration_"..i)
+        elseif x == 3 then
+          params:show("pattern_rec_start_"..i)
+          params:show("pattern_rec_duration_"..i)
+        end
+        _menu.rebuild_params()
+      end
+    )
+  end
+
+  params:add_group("snapshots", 5)
+  params:add_separator("reset position w/restore?")
+  for i = 1,4 do
+    params:add_option("snapshot_restore_pos_"..i, "voice ["..i.."]", {'yes','no'}, 1)
+  end
+
   params:add_group("misc",12)
   params:add_option("KEY3","KEY3", {"~~", "0.5", "-1", "1.5", "2"}, 1)
   params:set_action("KEY3", function(x) KEY3 = x end)
