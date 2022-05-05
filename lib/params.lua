@@ -158,7 +158,7 @@ function _params.init()
     params:add_option("transport_start_play_voice_"..i, "voice ["..i.."]",{"no","yes"},1)
   end
 
-  params:add_group("recording",10)
+  params:add_group("recording",15)
   params:add_separator("record trigger")
   for i = 1,4 do
     params:add_option("rec_trigger_voice_"..i, "voice ["..i.."]",{"free","clock","threshold"})
@@ -180,6 +180,10 @@ function _params.init()
         -- reset to 8 seconds or 16 beats
       end
     end)
+  end
+  params:add_separator("rec cue window quantization")
+  for i = 1,4 do
+    params:add_option("queue_window_quant_voice_"..i, "voice ["..i.."]",{"free","fixed"},1)
   end
 
   params:add_group("patterns", 13)
