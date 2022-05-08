@@ -2,22 +2,42 @@ local loop = {}
 
 function loop.queue_record(_t,silent)
 
-  if params:string("rec_trigger_voice_".._t) == "clock" then
-    if rec[_t] == 0 and clear[_t] == 1 then
+  if rec[_t] == 0 and clear[_t] == 1 then
+    if params:string("rec_enable_voice_".._t) == "clock" then
       holding_crane[_t]= 1
       screen_dirty = true
       track[_t].rec_on_clock = clock.run(
         function()
-          -- clock.sync(4,-1/16)
+          -- print("queued record on ".._t, silent)
           clock.sync(4)
           loop.execute_record(_t,silent)
           holding_crane[_t] = 0
         end
       )
+    elseif params:string("rec_enable_voice_".._t) == "free" then
+      loop.execute_record(_t,silent)
+      holding_crane[_t] = 0
     end
-  else
-    loop.execute_record(_t,silent)
-    holding_crane[_t] = 0
+  elseif rec[_t] == 1 and clear[_t] == 1 then
+    -- if params:string("rec_disable_voice_".._t) == "clock" and params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
+    --   holding_crane[_t] = 1
+    --   screen_dirty = true
+    --   track[_t].rec_off_clock = clock.run(
+    --     function()
+    --       clock.sync(4)
+    --       print(clock.get_beats())
+    --       loop.execute_record(_t,silent)
+    --       holding_crane[_t] = 0
+    --     end
+    --   )
+    -- elseif params:string("rec_disable_voice_".._t) == "free" and params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
+    --   loop.execute_record(_t,silent)
+    -- else
+    --   print("unknown.")
+    -- end
+    if params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
+      loop.execute_record(_t,silent)
+    end
   end
 
 end
@@ -50,14 +70,14 @@ function loop.execute_record(_t,silent)
     track[_t].playing = true
     recording_crane[_t] = 1
     screen_dirty = true
-    counter:start()
+    counter[_t]:start()
   -- if the buffer is clear and key 2 is pressed again:
   -- main recording will disable, loop points set
   elseif rec[_t] == 0 and clear[_t] == 1 then
     clear[_t] = 0
     softcut.position(_t,track[_t].start_point)
     softcut.rec_level(_t,0)
-    counter:stop()
+    counter[_t]:stop()
     softcut.poll_start_phase()
     track[_t].playing = true
     -- track[_t].end_point = util.round(softcut_offsets[_t] + rec_time[_t],0.01)
@@ -66,7 +86,7 @@ function loop.execute_record(_t,silent)
     else
       track[_t].end_point = (softcut_offsets[_t] + rec_time[_t])
     end
-    print(_t,track[_t].end_point)
+    print(_t,track[_t].end_point, rec_time[_t])
     softcut.loop_end(_t,track[_t].end_point)
     softcut.loop_start(_t,track[_t].start_point)
     -- track[2].start_point = 0

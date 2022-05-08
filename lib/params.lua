@@ -158,11 +158,22 @@ function _params.init()
     params:add_option("transport_start_play_voice_"..i, "voice ["..i.."]",{"no","yes"},1)
   end
 
-  params:add_group("recording",15)
-  params:add_separator("record trigger")
+  params:add_group("recording",20)
+  params:add_separator("record enable trigger")
   for i = 1,4 do
-    params:add_option("rec_trigger_voice_"..i, "voice ["..i.."]",{"free","clock","threshold"})
-    params:set_action("rec_trigger_voice_"..i,function(x)
+    params:add_option("rec_enable_voice_"..i, "voice ["..i.."]",{"free","clock","threshold"})
+    params:set_action("rec_enable_voice_"..i,function(x)
+      if x == 1 and rec[i] == 0 and clear[i] == 1 then
+        
+      else
+        
+      end
+    end)
+  end
+  params:add_separator("record disable trigger")
+  for i = 1,4 do
+    params:add_option("rec_disable_voice_"..i, "voice ["..i.."]",{"free","clock","threshold"})
+    params:set_action("rec_disable_voice_"..i,function(x)
       if x == 1 and rec[i] == 0 and clear[i] == 1 then
         
       else
@@ -172,7 +183,7 @@ function _params.init()
   end
   params:add_separator("loop sizing")
   for i = 1,4 do
-    params:add_option("loop_sizing_voice_"..i, "voice ["..i.."]",{"manual (w/K2)","dialed (w/encoders)"})
+    params:add_option("loop_sizing_voice_"..i, "voice ["..i.."]",{"manual (w/K3)","dialed (w/encoders)"})
     params:set_action("loop_sizing_voice_"..i,function(x)
       if x == 1 and rec[i] == 0 and clear[i] == 1 then
         -- reset to 60 seconds or max beat count
@@ -183,7 +194,7 @@ function _params.init()
   end
   params:add_separator("rec cue window quantization")
   for i = 1,4 do
-    params:add_option("queue_window_quant_voice_"..i, "voice ["..i.."]",{"free","fixed"},1)
+    params:add_option("queue_window_quant_voice_"..i, "voice ["..i.."]",{"free","fixed"},2)
   end
 
   params:add_group("patterns", 13)

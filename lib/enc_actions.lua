@@ -17,9 +17,19 @@ function enc_actions.process_encoder(n,d)
     -- encoder 3: voice 1's loop end point
     if n == 3 then
       if not key1_hold then
-        if rec[_t] == 1 and clear[_t] == 1 then
+        if not queue_menu.active then
+          if rec[_t] == 1 and clear[_t] == 1 then
+          else
+            enc_actions.delta_end_point(_t,enc_actions.calc_accum(d),false)
+          end
         else
-          enc_actions.delta_end_point(_t,enc_actions.calc_accum(d),key2_hold)
+          if queue_menu.sel == 1 then
+            enc_actions.delta_window(_t,d,true)
+          elseif queue_menu.sel == 2 then
+            enc_actions.delta_start_point(_t,enc_actions.calc_accum(d),true)
+          elseif queue_menu.sel == 3 then
+            enc_actions.delta_end_point(_t,enc_actions.calc_accum(d),true)
+          end
         end
       else
         _time.process_encoder(_t,n,d)
@@ -30,7 +40,10 @@ function enc_actions.process_encoder(n,d)
       if not key1_hold then
         if rec[_t] == 1 and clear[_t] == 1 then
         else
-          enc_actions.delta_start_point(_t,enc_actions.calc_accum(d),key2_hold)
+          enc_actions.delta_start_point(_t,enc_actions.calc_accum(d),false)
+        end
+        if queue_menu.active then
+          queue_menu.sel = util.clamp(queue_menu.sel+d,1,3)
         end
       else
         _time.process_encoder(_t,n,d)
@@ -43,13 +56,13 @@ function enc_actions.process_encoder(n,d)
       if key1_hold then
         voice_on_screen = util.clamp(voice_on_screen + d, 1, 4)
       else
-        if not key2_hold then
+        if not queue_menu.active then
           over[_t] = util.round(util.clamp((over[_t] + d/100), 0.0,1.0),0.01)
           if rec[voice_on_screen] % 2 == 1 then
             softcut.pre_level(_t,math.abs(over[_t]-1))
           end
         else
-          enc_actions.delta_window(_t,d,key2_hold)
+          enc_actions.delta_window(_t,d,queue_menu.active)
         end
       end
     end
@@ -62,18 +75,18 @@ end
 
 function enc_actions.delta_start_point(_t,d,queue)
   if queue then
-    track[_t].queued.start_point = util.clamp((util.round(track[_t].queued.start_point + d,0.01)), 0 + softcut_offsets[_t], global_duration + softcut_offsets[_t])
+    track[_t].queued.start_point = util.clamp((util.round(track[_t].queued.start_point + d,0.01)), 0 + softcut_offsets[_t], track[_t].queued.end_point - 0.01)
   else
-    track[_t].start_point = util.clamp((util.round(track[_t].start_point + d,0.01)), 0 + softcut_offsets[_t], global_duration + softcut_offsets[_t])
+    track[_t].start_point = util.clamp((util.round(track[_t].start_point + d,0.01)), 0 + softcut_offsets[_t], track[_t].end_point - 0.01)
     softcut.loop_start(_t,track[_t].start_point)
   end
 end
 
 function enc_actions.delta_end_point(_t,d,queue)
   if queue then
-    track[_t].queued.end_point = util.clamp((util.round(track[_t].queued.end_point + d,0.01)), 0 + softcut_offsets[_t], global_duration + softcut_offsets[_t])
+    track[_t].queued.end_point = util.clamp((util.round(track[_t].queued.end_point + d,0.01)), track[_t].queued.start_point + 0.01, global_duration + softcut_offsets[_t])
   else
-    track[_t].end_point = new_val
+    track[_t].end_point = util.clamp((util.round(track[_t].end_point + d,0.01)), track[_t].start_point + 0.01, global_duration + softcut_offsets[_t])
     softcut.loop_end(_t,track[_t].end_point)
   end
 end
@@ -89,13 +102,13 @@ function enc_actions.delta_window(_t,d,queue)
       end
     else
       if d > 0 then
-        if track[_t].queued.end_point + (math.abs(track[_t].queued.end_point - track[_t].queued.start_point)) <= global_duration + softcut_offsets[_t] then
+        if util.round(track[_t].queued.end_point + (math.abs(track[_t].queued.end_point - track[_t].queued.start_point)),0.0000001) <= global_duration + softcut_offsets[_t] then
           local original_start = track[_t].queued.start_point
           track[_t].queued.start_point = track[_t].queued.end_point
           track[_t].queued.end_point = track[_t].queued.end_point + (math.abs(track[_t].queued.end_point - original_start))
         end
       elseif d < 0 then
-        if track[_t].queued.start_point - (math.abs(track[_t].queued.end_point - track[_t].queued.start_point)) >= softcut_offsets[_t] then
+        if util.round(track[_t].queued.start_point - (math.abs(track[_t].queued.end_point - track[_t].queued.start_point)),0.0000001) >= softcut_offsets[_t] then
           local original_end = track[_t].queued.end_point
           track[_t].queued.end_point = track[_t].queued.start_point
           track[_t].queued.start_point = track[_t].queued.start_point - (math.abs(original_end - track[_t].queued.start_point))

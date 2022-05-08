@@ -41,6 +41,7 @@ _ea = include 'lib/enc_actions'
 pattern_time = require 'pattern_time'
 _pat = include 'lib/patterns'
 _loop = include 'lib/loop'
+_cue = include 'lib/queue'
 
 DATA_DIR = _path.data.."cranes/"
 AUDIO_DIR = _path.audio.."cranes/"
@@ -49,16 +50,6 @@ grid_alt = false
 
 function r()
   norns.script.load(norns.state.script)
-end
-
--- counting ms between key 2 taps
--- sets loop length
-function count()
-  for i = 1,4 do
-    if rec[i] == 1 then
-      rec_time[i] = rec_time[i] + 0.005
-    end
-  end
 end
 
 -- track recording state
@@ -119,8 +110,20 @@ function grid.add(dev)
   grid_dirty = true
 end
 
+-- counting ms between key 2 taps
+-- sets loop length
+for i = 1,4 do
+  _G["count_"..i] = 
+  function()
+    if rec[i] == 1 then
+      rec_time[i] = rec_time[i] + 0.005
+    end
+  end
+end
+
 function init()
   _pat.init()
+  _cue.init()
   g = grid.connect()
 
   softcut.buffer_clear()
@@ -162,11 +165,25 @@ function init()
   _song.init()
   _time.init()
   
-  counter = metro.init(count, 0.005, -1)
+  -- counter = metro.init(count, 0.005, -1)
+  counter = {}
+  for i = 1,4 do
+    counter[i] = metro.init(_G["count_"..i], 0.005, -1)
+  end
   rec_time = {0,0,0,0}
 
   KEY3_hold = false
   key1_hold = false
+  prelim_key2_hold = false
+  key2_hold = false
+
+  key2_hold_counter = metro.init()
+  key2_hold_counter.time = 0.25
+  key2_hold_counter.count = 1
+  key2_hold_counter.event = function()
+    key2_hold = true
+    screen_dirty = true
+  end
 
   voice_on_screen = 1
 
@@ -196,7 +213,8 @@ function init()
   -- dev
   for i = 1,4 do
     params:set("loop_sizing_voice_"..i, 2)
-    params:set("rec_trigger_voice_"..i, 2)
+    params:set("rec_enable_voice_"..i, 2)
+    params:set("rec_disable_voice_"..i, 2)
     track[i].end_point = softcut_offsets[i]+8
     track[i].queued.end_point = track[i].end_point
     softcut.recpre_slew_time(i,0.01)
@@ -323,6 +341,10 @@ overdub_crane = {0,0,0,0}
 holding_crane = {0,0,0,0}
 c2 = math.random(4,12)
 
+queue_menu = {}
+queue_menu.active = false
+queue_menu.sel = 1
+
 -- key hardware interaction
 function key(n,z)
   if not song_menu then
@@ -331,7 +353,26 @@ function key(n,z)
     -- KEY 2
     if n == 2 then
       if not key1_hold then
-        key2_hold = z == 1 and true or false
+        if z == 1 then
+          if queue_menu.active and not key2_hold then
+            key2_hold_counter:start()
+          end
+          if not queue_menu.active then
+            queue_menu.active = true
+            prelim_key2_hold = true
+          end
+        else
+          if queue_menu.active then
+            key2_hold_counter:stop()
+            if prelim_key2_hold == false and key2_hold == false then
+              queue_menu.active = false
+            end
+            prelim_key2_hold = false
+            key2_hold = false
+          else
+            if key2_hold then key2_hold = false end
+          end
+        end
       elseif z == 1 then
         song_menu = true
         key1_hold = false
@@ -344,20 +385,22 @@ function key(n,z)
       if key1_hold then
         _time.process_key(_t,n,z)
       else
-        if _t == 1 or _t == 2 then
-          if _t == 1 and clear[1] == 0 then
-            _loop.queue_record(1)
-          elseif _t == 2 and clear[2] == 0 then
-            _loop.queue_record(2)
-          elseif (_t == 1 or _t == 2) and (clear[1] == 1 and clear[2] == 1) then
-            _loop.queue_record(1)
-            _loop.queue_record(2)
+        if z == 1 then
+          if _t == 1 or _t == 2 then
+            if _t == 1 and clear[1] == 0 then
+              _loop.queue_record(1)
+            elseif _t == 2 and clear[2] == 0 then
+              _loop.queue_record(2)
+            elseif (_t == 1 or _t == 2) and (clear[1] == 1 and clear[2] == 1) then
+              _loop.queue_record(1)
+              _loop.queue_record(2)
+            end
+          else
+            _loop.queue_record(_t)
           end
-        else
-          _loop.queue_record(_t)
         end
-        key3_hold = z == 1 and true or false
       end
+      key3_hold = z == 1 and true or false
     end
 
     -- KEY 1
@@ -422,14 +465,21 @@ function redraw()
       local _t = voice_on_screen
       
       
-      if key2_hold then
+      if queue_menu.active then
+        screen.move(0,30)
+        screen.text(key2_hold and "ehehehe" or "")
         screen.move(0,40)
-        screen.text("E1: move window ("..params:string("queue_window_quant_voice_".._t)..")")
+        screen.level(queue_menu.sel == 1 and 15 or 3)
+        screen.text("move loop window ("..params:string("queue_window_quant_voice_".._t)..")")
         screen.move(0,50)
-        screen.text("(rec cue) s".._t..": "..util.round(track[_t].queued.start_point - softcut_offsets[_t],0.01).."s")
+        screen.level(queue_menu.sel == 2 and 15 or 3)
+        screen.text("(cue) s".._t..": "..util.round(track[_t].queued.start_point - softcut_offsets[_t],0.01).."s")
         screen.move(0,60)
-        screen.text("(rec cue) e".._t..": "..util.round(track[_t].queued.end_point - softcut_offsets[_t],0.01).."s")
+        screen.level(queue_menu.sel == 3 and 15 or 3)
+        screen.text("(cue) e".._t..": "..util.round(track[_t].queued.end_point - softcut_offsets[_t],0.01).."s")
       else
+        screen.move(0,30)
+        screen.text(key2_hold and "ehehehe" or "")
         screen.move(0,40)
         screen.text("o".._t..": "..over[_t])
         screen.move(0,50)

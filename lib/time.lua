@@ -45,6 +45,8 @@ function time.snap_loop_to_beats(_t,beats)
   local scaled_time = time.get_beats(_t)
   track[_t].end_point = track[_t].start_point + scaled_time
   softcut.loop_end(_t,track[_t].end_point)
+  track[_t].queued.start_point = track[_t].start_point
+  track[_t].queued.end_point = track[_t].end_point
   screen_dirty = true
   grid_dirty = true
 end
