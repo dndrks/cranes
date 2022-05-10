@@ -29,7 +29,10 @@ function queue.on_render(ch, start, i, s)
   end
   waveform_samples[_t] = s
   interval[_t] = i
-  print(queue.crawl_audio(_t)) -- this would be where we assign state to clear[_t]...
+  queue.crawl_audio(_t)
+  -- print(queue.crawl_audio(_t)) -- this would be where we assign state to clear[_t]...
+  -- local stuff = queue.crawl_audio(_t)
+  -- clear[_t] = queue.crawl_audio(_t) and false or true
 end
 
 function just_returns(x)
@@ -54,15 +57,10 @@ function queue.crawl_audio(_t)
   local stand_in = waveform_samples[_t]
   table.sort(stand_in)
   if math.abs(stand_in[1]) > 0.003 or math.abs(stand_in[128]) > 0.003 then
-    return true
+    clear[_t] = false
   else
-    return false
+    clear[_t] = true
   end
 end
 
 return queue
-
--- _cue.average(waveform_samples[2])
--- 0.0044758486196486
--- _cue.average(waveform_samples[1])
--- 0.014228958310213

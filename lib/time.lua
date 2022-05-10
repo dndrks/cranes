@@ -40,13 +40,17 @@ function time.get_beats(_t)
   return total_time
 end
 
-function time.snap_loop_to_beats(_t,beats)
+function time.snap_loop_to_beats(_t,beats,mode)
   -- local scaled_time = clock.get_beat_sec() * beats
   local scaled_time = time.get_beats(_t)
-  track[_t].end_point = track[_t].start_point + scaled_time
-  softcut.loop_end(_t,track[_t].end_point)
-  track[_t].queued.start_point = track[_t].start_point
-  track[_t].queued.end_point = track[_t].end_point
+  if mode == "loop" then
+    track[_t].end_point = track[_t].start_point + scaled_time
+    softcut.loop_end(_t,track[_t].end_point)
+    track[_t].queued.start_point = track[_t].start_point
+    track[_t].queued.end_point = track[_t].end_point
+  elseif mode == "cue" then
+    track[_t].queued.end_point = track[_t].queued.start_point + scaled_time
+  end
   screen_dirty = true
   grid_dirty = true
 end
@@ -82,7 +86,7 @@ end
 
 function time.process_key(_t,n,z)
   if n == 3 and z == 1 then
-    time.snap_loop_to_beats(_t,time.get_beats(_t))
+    time.snap_loop_to_beats(_t,time.get_beats(_t),queue_menu.active and "cue" or "loop")
   end
 end
 

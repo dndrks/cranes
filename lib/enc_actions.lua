@@ -18,9 +18,10 @@ function enc_actions.process_encoder(n,d)
     if n == 3 then
       if not key1_hold then
         if not queue_menu.active then
-          if rec[_t] == 1 and clear[_t] == 1 then
+          if rec[_t] and clear[_t] then
           else
             enc_actions.delta_end_point(_t,enc_actions.calc_accum(d),false)
+            enc_actions.delta_end_point(_t,enc_actions.calc_accum(d),true)
           end
         else
           if queue_menu.sel == 1 then
@@ -38,11 +39,13 @@ function enc_actions.process_encoder(n,d)
     -- encoder 2: voice 1's loop start point
     elseif n == 2 then
       if not key1_hold then
-        if rec[_t] == 1 and clear[_t] == 1 then
+        if not queue_menu.active then
+          if rec[_t] and clear[_t] then
+          else
+            enc_actions.delta_start_point(_t,enc_actions.calc_accum(d),false)
+            enc_actions.delta_start_point(_t,enc_actions.calc_accum(d),true)
+          end
         else
-          enc_actions.delta_start_point(_t,enc_actions.calc_accum(d),false)
-        end
-        if queue_menu.active then
           queue_menu.sel = util.clamp(queue_menu.sel+d,1,3)
         end
       else
@@ -58,7 +61,7 @@ function enc_actions.process_encoder(n,d)
       else
         if not queue_menu.active then
           over[_t] = util.round(util.clamp((over[_t] + d/100), 0.0,1.0),0.01)
-          if rec[voice_on_screen] % 2 == 1 then
+          if rec[voice_on_screen] then
             softcut.pre_level(_t,math.abs(over[_t]-1))
           end
         else

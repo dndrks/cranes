@@ -163,7 +163,7 @@ function _params.init()
   for i = 1,4 do
     params:add_option("rec_enable_voice_"..i, "voice ["..i.."]",{"free","clock","threshold"})
     params:set_action("rec_enable_voice_"..i,function(x)
-      if x == 1 and rec[i] == 0 and clear[i] == 1 then
+      if x == 1 and not rec[i] and clear[i] then
         
       else
         
@@ -174,7 +174,7 @@ function _params.init()
   for i = 1,4 do
     params:add_option("rec_disable_voice_"..i, "voice ["..i.."]",{"free","clock","threshold"})
     params:set_action("rec_disable_voice_"..i,function(x)
-      if x == 1 and rec[i] == 0 and clear[i] == 1 then
+      if x == 1 and not rec[i] and clear[i] then
         
       else
         
@@ -185,7 +185,7 @@ function _params.init()
   for i = 1,4 do
     params:add_option("loop_sizing_voice_"..i, "voice ["..i.."]",{"manual (w/K3)","dialed (w/encoders)"})
     params:set_action("loop_sizing_voice_"..i,function(x)
-      if x == 1 and rec[i] == 0 and clear[i] == 1 then
+      if x == 1 and not rec[i] and clear[i] then
         -- reset to 60 seconds or max beat count
       else
         -- reset to 8 seconds or 16 beats
@@ -246,8 +246,8 @@ function _params.init()
     os.execute("mkdir -p "..AUDIO_DIR..name)
     local scaled = {
       -- {buffer, start, end}
-      {1,0},
-      {params:get("voice_2_buffer"),0},
+      {1,softcut_offsets[1]},
+      {params:get("voice_2_buffer"),softcut_offsets[2]},
       {1,softcut_offsets[3]},
       {2,softcut_offsets[4]}
     }

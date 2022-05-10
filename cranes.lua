@@ -43,6 +43,9 @@ _pat = include 'lib/patterns'
 _loop = include 'lib/loop'
 _cue = include 'lib/queue'
 
+engine.name="SimpleDelay"
+osc.event = osc_in
+
 DATA_DIR = _path.data.."cranes/"
 AUDIO_DIR = _path.audio.."cranes/"
 TRACKS = 2
@@ -53,8 +56,9 @@ function r()
 end
 
 -- track recording state
-rec = {0,0,0,0}
-clear = {1,1,1,1}
+rec = {false,false,false,false}
+rec_queued = {false,false,false,false}
+clear = {true,true,true,true}
 offset = {1,1,1,1}
 pp = {0,0,0,0}
 
@@ -79,7 +83,7 @@ snapshot_count = {0,0,0,0}
 selected_snapshot = {0,0,0,0}
 snapshot_mod = {["index"] = 0, ["held"] = {false,false,false,false,false,false}}
 
-softcut_offsets = {0,0,100,100}
+softcut_offsets = {1,1,101,101}
 global_duration = 60
 
 track = {}
@@ -115,7 +119,7 @@ end
 for i = 1,4 do
   _G["count_"..i] = 
   function()
-    if rec[i] == 1 then
+    if rec[i] then
       rec_time[i] = rec_time[i] + 0.005
     end
   end
@@ -148,7 +152,8 @@ function init()
     softcut.loop_start(i, softcut_offsets[i])
     softcut.loop_end(i, global_duration+softcut_offsets[i])
     softcut.loop(i, 1)
-    softcut.fade_time(i, 0.01)
+    softcut.fade_time(i, 0.015)
+    softcut.recpre_slew_time(i,0.015)
     softcut.rec(i, 1) -- TODO CONFIRM GOOD
     softcut.rec_level(i, 0)
     softcut.pre_level(i, 1)
@@ -217,9 +222,9 @@ function init()
     params:set("rec_disable_voice_"..i, 2)
     track[i].end_point = softcut_offsets[i]+8
     track[i].queued.end_point = track[i].end_point
-    softcut.recpre_slew_time(i,0.01)
     softcut.enable(i,1)
   end
+  engine.threshold(-30)
 end
 
 function get_total_pitch_offset(_t)
@@ -258,11 +263,11 @@ end
 function phase(n, x)
   if track[n].playing then
     track[n].poll_position = x
-    if rec[n] == 1 and clear[n] == 1 then
+    if rec[n] and clear[n] then
       if x > track[n].rec_limit then
         track[n].rec_limit = x
       end
-    elseif rec[n] == 1 and clear[n] == 0 then
+    elseif rec[n] and not clear[n] then
       if (x > track[n].rec_limit) and (track[n].end_point > track[n].rec_limit) then
         track[n].rec_limit = track[n].end_point
       end
@@ -315,11 +320,11 @@ end
 
 function restore_speed()
   ray = speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)]
-  if params:get("KEY3") == 2 then
-    softcut.rate_slew_time(voice_on_screen,0.01)
-  else
-    softcut.rate_slew_time(voice_on_screen,0.6)
-  end
+  -- if params:get("KEY3") == 2 then
+  --   softcut.rate_slew_time(voice_on_screen,0.01)
+  -- else
+  --   softcut.rate_slew_time(voice_on_screen,0.6)
+  -- end
   -- softcut.rate(voice_on_screen,speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)]*offset[voice_on_screen])
   softcut.rate(voice_on_screen, get_total_pitch_offset(voice_on_screen))
 end
@@ -387,11 +392,11 @@ function key(n,z)
       else
         if z == 1 then
           if _t == 1 or _t == 2 then
-            if _t == 1 and clear[1] == 0 then
+            if _t == 1 and not clear[1] then
               _loop.queue_record(1)
-            elseif _t == 2 and clear[2] == 0 then
+            elseif _t == 2 and not clear[2] then
               _loop.queue_record(2)
-            elseif (_t == 1 or _t == 2) and (clear[1] == 1 and clear[2] == 1) then
+            elseif (_t == 1 or _t == 2) and (clear[1] and clear[2]) then
               _loop.queue_record(1)
               _loop.queue_record(2)
             end
@@ -449,7 +454,11 @@ function redraw()
       end
       screen.move(0,55)
       screen.level(15)
-      screen.text("quantize loop: ")
+      if queue_menu.active then
+        screen.text("quantize cue: ")
+      else
+        screen.text("quantize loop: ")
+      end
       screen.level(_time.menu.sel == 1 and 15 or 4)
       screen.move(screen.text_extents("quantize loop: ")+4,55)
       screen.text(_time.menu.div_mult[voice_on_screen])
@@ -470,7 +479,7 @@ function redraw()
         screen.text(key2_hold and "ehehehe" or "")
         screen.move(0,40)
         screen.level(queue_menu.sel == 1 and 15 or 3)
-        screen.text("move loop window ("..params:string("queue_window_quant_voice_".._t)..")")
+        screen.text("move cue window ("..params:string("queue_window_quant_voice_".._t)..")")
         screen.move(0,50)
         screen.level(queue_menu.sel == 2 and 15 or 3)
         screen.text("(cue) s".._t..": "..util.round(track[_t].queued.start_point - softcut_offsets[_t],0.01).."s")
@@ -502,9 +511,9 @@ function redraw()
       screen.level(3)
       screen.move(0,10)
       if voice_on_screen == 1 or voice_on_screen == 2 then
-        screen.text("one: "..util.round(track[1].poll_position,0.1).."s")
+        screen.text("one: "..util.round(track[1].poll_position - softcut_offsets[1],0.1).."s")
         screen.move(0,20)
-        screen.text("two: "..util.round(track[2].poll_position,0.1).."s")
+        screen.text("two: "..util.round(track[2].poll_position - softcut_offsets[2],0.1).."s")
       else
         screen.text((_t == 3 and "three: " or "four: ")..util.round(track[_t].poll_position - softcut_offsets[_t],0.1).."s")
       end
@@ -613,7 +622,7 @@ function event_exec(e)
   local _t = e.voice
   -- tab.print(e)
   if e.section == "CUT" then
-    if rec[_t] == 0 or (rec[_t] == 1 and clear[_t] == 0) then
+    if not rec[_t] or (rec[_t] and not clear[_t]) then
       local _block = (track[_t].end_point - track[_t].start_point) / 8
       local _cutposition = _block * (e.x-1) + softcut_offsets[_t]
       if params:string("chittering_mode_".._t) ~= "off" then
@@ -659,7 +668,7 @@ if y >= 5 and y <= 8 and x <= 8 and z == 1 then
   event(_e)
 elseif y >= 1 and y <= 4 and x <=6 and z == 1 then
   local _t = y
-  if rec[_t] == 0 or (rec[_t] == 1 and clear[_t] == 0) then
+  if not rec[_t] or (rec[_t] and not clear[_t]) then
     if not track[_t].reverse then
       params:set("speed_voice_".._t,x+5)
     else
@@ -669,7 +678,7 @@ elseif y >= 1 and y <= 4 and x <=6 and z == 1 then
   end
 elseif y >= 1 and y <= 4 and x == 7 and z == 1 then
   local _t = y
-  if rec[_t] == 0 or (rec[_t] == 1 and clear[_t] == 0) then
+  if not rec[_t] or (rec[_t] and not clear[_t]) then
     track[_t].reverse = not track[_t].reverse
     local reverse_current = {11,10,9,8,7,6,5,4,3,2,1}
     params:set("speed_voice_".._t,reverse_current[params:get("speed_voice_".._t)])
@@ -778,7 +787,7 @@ function grid_redraw()
       g:led(1,i,0)
     end
     g:led(7,i,track[_t].reverse and 15 or 0)
-    g:led(8,i,rec[_t] == 1 and 15 or (clear[_t] == 0 and 8 or 3) or 3)
+    g:led(8,i,rec[_t] and 15 or (not clear[_t] and 8 or 3) or 3)
   end
 
   for i = 1,4 do

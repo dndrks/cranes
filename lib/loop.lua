@@ -1,80 +1,115 @@
 local loop = {}
 
 function loop.queue_record(_t,silent)
+  if not rec_queued[_t] then
+    if not rec[_t] and clear[_t] then
+      if params:string("rec_enable_voice_".._t) == "clock" then
+        holding_crane[_t]= 1
+        screen_dirty = true
+        track[_t].rec_on_clock = clock.run(
+          function()
+            -- print("queued record on ".._t, silent)
+            -- clock.sync(4,-1/128)
+            clock.sync(4)
+            loop.execute_record(_t,silent)
+            holding_crane[_t] = 0
+          end
+        )
+      elseif params:string("rec_enable_voice_".._t) == "free" then
+        loop.execute_record(_t,silent)
+        holding_crane[_t] = 0
+      end
+    elseif rec[_t] and clear[_t] then
+      -- if params:string("rec_disable_voice_".._t) == "clock" and params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
+      --   holding_crane[_t] = 1
+      --   screen_dirty = true
+      --   track[_t].rec_off_clock = clock.run(
+      --     function()
+      --       clock.sync(4)
+      --       print(clock.get_beats())
+      --       loop.execute_record(_t,silent)
+      --       holding_crane[_t] = 0
+      --     end
+      --   )
+      -- elseif params:string("rec_disable_voice_".._t) == "free" and params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
+      --   loop.execute_record(_t,silent)
+      -- else
+      --   print("unknown.")
+      -- end
+      if params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
+        loop.execute_record(_t,silent)
+      end
+    end
 
-  if rec[_t] == 0 and clear[_t] == 1 then
-    if params:string("rec_enable_voice_".._t) == "clock" then
-      holding_crane[_t]= 1
-      screen_dirty = true
-      track[_t].rec_on_clock = clock.run(
-        function()
-          -- print("queued record on ".._t, silent)
-          clock.sync(4)
-          loop.execute_record(_t,silent)
-          holding_crane[_t] = 0
-        end
-      )
-    elseif params:string("rec_enable_voice_".._t) == "free" then
-      loop.execute_record(_t,silent)
-      holding_crane[_t] = 0
-    end
-  elseif rec[_t] == 1 and clear[_t] == 1 then
-    -- if params:string("rec_disable_voice_".._t) == "clock" and params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
-    --   holding_crane[_t] = 1
-    --   screen_dirty = true
-    --   track[_t].rec_off_clock = clock.run(
-    --     function()
-    --       clock.sync(4)
-    --       print(clock.get_beats())
-    --       loop.execute_record(_t,silent)
-    --       holding_crane[_t] = 0
-    --     end
-    --   )
-    -- elseif params:string("rec_disable_voice_".._t) == "free" and params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
-    --   loop.execute_record(_t,silent)
-    -- else
-    --   print("unknown.")
-    -- end
-    if params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
-      loop.execute_record(_t,silent)
-    end
+  elseif rec_queued[_t] then
+    holding_crane[_t]= 1
+    screen_dirty = true
+    track[_t].rec_on_clock = clock.run(
+      function()
+        print("queued record on ".._t, clock.get_beats())
+        -- clock.sync(4,-1/128)
+        clock.sync(4)
+        loop.execute_record(_t,silent)
+        holding_crane[_t] = 0
+      end
+    )
   end
 
 end
 
 function loop.execute_record(_t,silent)
+  print(clock.get_beats())
   if not silent then
-    rec[_t] = rec[_t] == 0 and 1 or 0
+    rec[_t] = not rec[_t]
+  end
+  -- check to see if the cue section is meant to be recorded into
+  -- if so, enforce it
+  if rec_queued[_t] then
+    track[_t].start_point = track[_t].queued.start_point
+    track[_t].end_point = track[_t].queued.end_point
+    softcut.loop_start(_t,track[_t].start_point)
+    softcut.loop_end(_t,track[_t].end_point)
+    rec_queued[_t] = false
+    rec[_t] = true
+    _cue.is_there_audio(_t)
+    print("is clear: "..(tostring(clear[_t])), track[_t].start_point, track[_t].end_point)
   end
   -- if the buffer is clear and recording is enabled:
   -- main recording will enable
-  if rec[_t] == 1 and clear[_t] == 1 then
+  if rec[_t] and clear[_t] then
     local scaled = {
       -- {buffer, start, end}
-      {1,0},
-      {params:get("voice_2_buffer"),0},
+      {1,softcut_offsets[1]},
+      {params:get("voice_2_buffer"),softcut_offsets[2]},
       {1,softcut_offsets[3]},
       {2,softcut_offsets[4]}
     }
-    -- softcut.buffer_clear_region_channel(scaled[_t][1],scaled[_t][2],60)
+    -- if rec_queued[_t] then
+    --   track[_t].start_point = track[_t].queued.start_point
+    --   track[_t].end_point = track[_t].queued.end_point
+    --   softcut.loop_start(_t,track[_t].start_point)
+    --   softcut.loop_end(_t,track[_t].end_point)
+    --   rec_queued[_t] = false
+    -- end
     softcut.position(_t,track[_t].start_point)
-    softcut.rate_slew_time(_t,0.01)
+    -- softcut.rate_slew_time(_t,0.01)
+    softcut.rate_slew_time(_t,0)
     -- softcut.enable(_t, 1)
     -- softcut.rate(_t, 1*offset[_t])
     softcut.rate(_t, 1) -- TODO CONFIRM THIS IS OKAY
     softcut.play(_t, 1)
-    -- softcut.rec(_t, 1)
     softcut.rec_level(_t,1)
     softcut.level(_t, 0)
     softcut.poll_start_phase()
+    counter[_t]:start()
     track[_t].playing = true
     recording_crane[_t] = 1
     screen_dirty = true
-    counter[_t]:start()
   -- if the buffer is clear and key 2 is pressed again:
   -- main recording will disable, loop points set
-  elseif rec[_t] == 0 and clear[_t] == 1 then
-    clear[_t] = 0
+  elseif not rec[_t] and clear[_t] then
+    -- clear[_t] = false
+    _cue.is_there_audio(_t)
     softcut.position(_t,track[_t].start_point)
     softcut.rec_level(_t,0)
     counter[_t]:stop()
@@ -102,17 +137,17 @@ function loop.execute_record(_t,silent)
   end
   -- if the buffer is NOT clear and key 2 is pressed:
   -- overwrite/overdub behavior will enable
-  if rec[_t] == 1 and clear[_t] == 0 then
+  if rec[_t] and not clear[_t] then
     loop.toggle_overdub(_t,"on")
   -- if the buffer is NOT clear and key 2 is pressed again:
   -- overwrite/overdub behavior will disable
-  elseif rec[_t] == 0 and clear[_t] == 0 then
+  elseif not rec[_t] and not clear[_t] then
     loop.toggle_overdub(_t,"off")
   end
 
   if params:string("loop_sizing_voice_".._t) == "dialed (w/encoders)" then
     print("eval loop")
-    if rec[_t] == 1 and clear[_t] == 1 then
+    if rec[_t] and clear[_t] then
       track[_t].rec_off_clock = clock.run(
         function()
           clock.sleep(track[_t].end_point - track[_t].start_point)
@@ -126,7 +161,7 @@ end
 
 function loop.toggle_overdub(_t,state)
   if state == "on" then
-    rec[_t] = 1
+    rec[_t] = true
     softcut.rec_level(_t,1)
     softcut.pre_level(_t,math.abs(over[_t]-1))
     recording_crane[_t] = 1
@@ -135,7 +170,7 @@ function loop.toggle_overdub(_t,state)
     --   track[_t].rec_limit = track[_t].end_point
     -- end
   else
-    rec[_t] = 0
+    rec[_t] = false
     softcut.rec_level(_t,0)
     softcut.pre_level(_t,1)
     recording_crane[_t] = 0
@@ -147,8 +182,8 @@ end
 function loop.clear_track(_t)
   local scaled = {
     -- {buffer, start, end}
-    {1,0,global_duration},
-    {params:get("voice_2_buffer"),0,global_duration},
+    {1,softcut_offsets[1],global_duration},
+    {params:get("voice_2_buffer"),softcut_offsets[2],global_duration},
     {1,softcut_offsets[3],global_duration + softcut_offsets[3]},
     {2,softcut_offsets[4],global_duration + softcut_offsets[4]},
   }
@@ -176,9 +211,10 @@ function loop.clear_track(_t)
   track[_t].start_point = scaled[_t][2]
   track[_t].end_point = scaled[_t][3]
 
-  clear[_t] = 1
+  -- clear[_t] = true
+  _cue.is_there_audio(_t)
   rec_time[_t] = 0
-  rec[_t] = 0
+  rec[_t] = false
   recording_crane[_t] = 0
   overdub_crane[_t] = 0
 
@@ -266,6 +302,29 @@ function loop.window(voice,x)
   softcut.loop_start(voice,track[voice].start_point)
   softcut.loop_end(voice,track[voice].end_point)
   screen_dirty = true
+end
+
+-- --
+-- -- osc
+-- --
+function osc_in(path, args, from)
+  if path == "onset" then
+    -- for i=1,6 do
+    --   if uS.recording[i]==1 and (params:get("input type")==1 or params:get("input type")>=4) then
+    --     -- print("incoming signal = "..val)
+    --     tape_rec(i)
+    --   end
+    -- end
+    -- loop.execute_record(1,silent)
+    if all_loaded then
+      for i = 1,2 do
+        if not rec[i] and clear[i] then
+          loop.execute_record(i,silent)
+        end
+      end
+      all_loaded = false
+    end
+  end
 end
 
 return loop
