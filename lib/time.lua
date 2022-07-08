@@ -45,7 +45,8 @@ function time.snap_loop_to_beats(_t,beats,mode)
   local scaled_time = time.get_beats(_t)
   if mode == "loop" then
     track[_t].end_point = track[_t].start_point + scaled_time
-    softcut.loop_end(_t,track[_t].end_point)
+    -- softcut.loop_end(_t,track[_t].end_point)
+    set_softcut_param('loop_end',_t,track[_t].end_point)
     track[_t].queued.start_point = track[_t].start_point
     track[_t].queued.end_point = track[_t].end_point
   elseif mode == "cue" then

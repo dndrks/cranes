@@ -62,7 +62,7 @@ function enc_actions.process_encoder(n,d)
         if not queue_menu.active then
           over[_t] = util.round(util.clamp((over[_t] + d/100), 0.0,1.0),0.01)
           if rec[voice_on_screen] then
-            softcut.pre_level(_t,math.abs(over[_t]-1))
+            set_softcut_param('pre_level',_t,math.abs(over[_t]-1))
           end
         else
           enc_actions.delta_window(_t,d,queue_menu.active)
@@ -81,7 +81,7 @@ function enc_actions.delta_start_point(_t,d,queue)
     track[_t].queued.start_point = util.clamp((util.round(track[_t].queued.start_point + d,0.01)), 0 + softcut_offsets[_t], track[_t].queued.end_point - 0.01)
   else
     track[_t].start_point = util.clamp((util.round(track[_t].start_point + d,0.01)), 0 + softcut_offsets[_t], track[_t].end_point - 0.01)
-    softcut.loop_start(_t,track[_t].start_point)
+    set_softcut_param('loop_start',_t,track[_t].start_point)
   end
 end
 
@@ -90,7 +90,7 @@ function enc_actions.delta_end_point(_t,d,queue)
     track[_t].queued.end_point = util.clamp((util.round(track[_t].queued.end_point + d,0.01)), track[_t].queued.start_point + 0.01, global_duration + softcut_offsets[_t])
   else
     track[_t].end_point = util.clamp((util.round(track[_t].end_point + d,0.01)), track[_t].start_point + 0.01, global_duration + softcut_offsets[_t])
-    softcut.loop_end(_t,track[_t].end_point)
+    set_softcut_param('loop_end',_t,track[_t].end_point)
   end
 end
 

@@ -67,8 +67,8 @@ function loop.execute_record(_t,silent)
   if rec_queued[_t] then
     track[_t].start_point = track[_t].queued.start_point
     track[_t].end_point = track[_t].queued.end_point
-    softcut.loop_start(_t,track[_t].start_point)
-    softcut.loop_end(_t,track[_t].end_point)
+    set_softcut_param('loop_start',_t,track[_t].start_point)
+    set_softcut_param('loop_end',_t,track[_t].end_point)
     rec_queued[_t] = false
     rec[_t] = true
     _cue.is_there_audio(_t)
@@ -91,15 +91,12 @@ function loop.execute_record(_t,silent)
     --   softcut.loop_end(_t,track[_t].end_point)
     --   rec_queued[_t] = false
     -- end
-    softcut.position(_t,track[_t].start_point)
-    -- softcut.rate_slew_time(_t,0.01)
-    softcut.rate_slew_time(_t,0)
-    -- softcut.enable(_t, 1)
-    -- softcut.rate(_t, 1*offset[_t])
-    softcut.rate(_t, 1) -- TODO CONFIRM THIS IS OKAY
-    softcut.play(_t, 1)
-    softcut.rec_level(_t,1)
-    softcut.level(_t, 0)
+    set_softcut_param('position',_t,track[_t].start_point)
+    set_softcut_param('rate_slew_time',_t,0)
+    set_softcut_param('rate',_t,1) -- TODO CONFIRM THIS IS OKAY
+    set_softcut_param('play',_t,1)
+    set_softcut_param('rec_level',_t,1)
+    set_softcut_param('level',_t,0)
     softcut.poll_start_phase()
     counter[_t]:start()
     track[_t].playing = true
@@ -110,8 +107,10 @@ function loop.execute_record(_t,silent)
   elseif not rec[_t] and clear[_t] then
     -- clear[_t] = false
     _cue.is_there_audio(_t)
-    softcut.position(_t,track[_t].start_point)
-    softcut.rec_level(_t,0)
+    -- softcut.position(_t,track[_t].start_point)
+    set_softcut_param('position',_t,track[_t].start_point)
+    -- softcut.rec_level(_t,0)
+    set_softcut_param('rec_level',_t,0)
     counter[_t]:stop()
     softcut.poll_start_phase()
     track[_t].playing = true
@@ -122,15 +121,19 @@ function loop.execute_record(_t,silent)
       track[_t].end_point = (softcut_offsets[_t] + rec_time[_t])
     end
     print(_t,track[_t].end_point, rec_time[_t])
-    softcut.loop_end(_t,track[_t].end_point)
-    softcut.loop_start(_t,track[_t].start_point)
+    -- softcut.loop_end(_t,track[_t].end_point)
+    set_softcut_param('loop_end',_t,track[_t].end_point)
+    -- softcut.loop_start(_t,track[_t].start_point)
+    set_softcut_param('loop_start',_t,track[_t].start_point)
     -- track[2].start_point = 0
     recording_crane[_t] = 0
     screen_dirty = true
     rec_time[_t] = 0
-    softcut.level(_t,params:get("vol_".._t))
+    -- softcut.level(_t,params:get("vol_".._t))
+    set_softcut_param('level',_t,params:get("vol_".._t))
     -- softcut.rate(_t,speedlist[_t][params:get("speed_voice_".._t)]*offset[_t])
-    softcut.rate(_t, get_total_pitch_offset(_t))
+    -- softcut.rate(_t, get_total_pitch_offset(_t))
+    set_softcut_param('rate',_t, get_total_pitch_offset(_t))
     if track[_t].end_point > track[_t].rec_limit then
       track[_t].rec_limit = track[_t].end_point
     end
@@ -159,11 +162,20 @@ function loop.execute_record(_t,silent)
   end
 end
 
+function loop.jump_to_cue(_t)
+  track[_t].start_point = track[_t].queued.start_point
+  track[_t].end_point = track[_t].queued.end_point
+  set_softcut_param('loop_start',_t,track[_t].start_point)
+  set_softcut_param('loop_end',_t,track[_t].end_point)
+end
+
 function loop.toggle_overdub(_t,state)
   if state == "on" then
     rec[_t] = true
-    softcut.rec_level(_t,1)
-    softcut.pre_level(_t,math.abs(over[_t]-1))
+    -- softcut.rec_level(_t,1)
+    set_softcut_param('rec_level',_t, 1)
+    -- softcut.pre_level(_t,math.abs(over[_t]-1))
+    set_softcut_param('pre_level',_t, math.abs(over[_t]-1))
     recording_crane[_t] = 1
     overdub_crane[_t] = 1
     -- if track[_t].end_point > track[_t].rec_limit then
@@ -171,8 +183,10 @@ function loop.toggle_overdub(_t,state)
     -- end
   else
     rec[_t] = false
-    softcut.rec_level(_t,0)
-    softcut.pre_level(_t,1)
+    -- softcut.rec_level(_t,0)
+    set_softcut_param('rec_level',_t,0)
+    -- softcut.pre_level(_t,1)
+    set_softcut_param('pre_level',_t,1)
     recording_crane[_t] = 0
     overdub_crane[_t] = 0
   end
@@ -193,18 +207,27 @@ function loop.clear_track(_t)
   if track[_t].rec_off_clock ~= nil then
     clock.cancel(track[_t].rec_off_clock)
   end
-  softcut.rec_level(_t, 0)
-  softcut.level(_t, 0)
-  softcut.play(_t, 1)
+  -- softcut.rec_level(_t, 0)
+  set_softcut_param('rec_level',_t,0)
+  -- softcut.level(_t, 0)
+  set_softcut_param('level',_t,0)
+  -- softcut.play(_t, 1)
+  set_softcut_param('play',_t,1)
   track[_t].playing = false
-  softcut.position(_t, scaled[_t][2])
-  -- softcut.rate(_t, 1*offset[_t])
-  softcut.rate(_t, 1) -- TODO CONFIRM THIS IS OK
-  softcut.loop_start(_t, scaled[_t][2])
-  softcut.loop_end(_t, scaled[_t][3])
-  softcut.position(_t, scaled[_t][2])
+  -- softcut.position(_t, scaled[_t][2])
+  set_softcut_param('position',_t,scaled[_t][2])
+  -- softcut.rate(_t, 1) -- TODO CONFIRM THIS IS OK
+  set_softcut_param('rate',_t,1)
+  -- softcut.loop_start(_t, scaled[_t][2])
+  set_softcut_param('loop_start',_t,scaled[_t][2])
+  -- softcut.loop_end(_t, scaled[_t][3])
+  set_softcut_param('loop_end',_t,scaled[_t][3])
+  -- softcut.position(_t, scaled[_t][2])
+  set_softcut_param('position',_t,scaled[_t][2])
   track[_t].rec_limit = 0
-  softcut.buffer_clear_region_channel(scaled[_t][1],scaled[_t][2],global_duration)
+  -- TODO GENERALIZE:
+  -- softcut.buffer_clear_region_channel(scaled[_t][1],scaled[_t][2],global_duration)
+  set_softcut_param('buffer clear', {scaled[_t][1],scaled[_t][2],global_duration})
 
   ray = speedlist[1][params:get("speed_voice_1")] -- TODO FIX
   
@@ -229,6 +252,7 @@ function loop.clear_track(_t)
   screen_dirty = true
   KEY3_hold = false
   params:set("semitone_offset_".._t,0) -- TODO VERIFY IF NEEDED...
+  track[_t].pos_grid = -1
 end
 
 function loop.move_window(_t,direction)
@@ -243,8 +267,10 @@ function loop.move_window(_t,direction)
 end
 
 function loop.refresh_softcut_loops(_t)
-  softcut.loop_start(_t,track[_t].start_point)
-  softcut.loop_end(_t,track[_t].end_point)
+  -- softcut.loop_start(_t,track[_t].start_point)
+  set_softcut_param('loop_start',_t,track[_t].start_point)
+  -- softcut.loop_end(_t,track[_t].end_point)
+  set_softcut_param('loop_end',_t,track[_t].end_point)
 end
 
 function loop.window(voice,x)
@@ -299,8 +325,7 @@ function loop.window(voice,x)
   elseif x == 16 then
     track[voice].end_point = track[voice].end_point + 0.01
   end
-  softcut.loop_start(voice,track[voice].start_point)
-  softcut.loop_end(voice,track[voice].end_point)
+  loop.refresh_softcut_loops(voice)
   screen_dirty = true
 end
 

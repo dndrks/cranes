@@ -23,7 +23,7 @@ function f_m.init()
   _fm_ = page.flow
 end
 
-local snapshot_restore_params = {"rate","start_point","end_point","level","filter","lfo"}
+local snapshot_restore_params = {{"rate","rate_ramp"},"start_point","end_point","vol","post_filter_fc","lfo"}
 
 function f_m.index_to_grid_pos(val,columns,i)
   local x = math.fmod(val-1,columns)+1
@@ -115,6 +115,10 @@ function f_m.draw_menu()
     elseif _fm_.main_sel == 2 then
       local _v = _fm_.voice
       local id = track[_v].snapshot.focus > 0 and track[_v].snapshot.focus or 1
+      if _fm_.alt and _fm_.scene_line_sel > 1 then
+        screen.move(0,62)
+        screen.text("K3: send all")
+      end
       if _fm_.scene_line_sel <= 7 then
         -- screen.move(55,0)
         -- screen.line(55,32)
@@ -135,13 +139,13 @@ function f_m.draw_menu()
         screen.text("loop end: "..(snapshots[_v][id].restore.end_point and "Y" or "N"))
         screen.level(_fm_.scene_line_sel == 5 and 15 or 3)
         screen.move(62,44)
-        screen.text("level: "..(snapshots[_v][id].restore.level and "Y" or "N"))
+        screen.text("level: "..(snapshots[_v][id].restore.vol and "Y" or "N"))
         screen.level(_fm_.scene_line_sel == 6 and 15 or 3)
         screen.move(62,52)
-        screen.text("filter: "..(snapshots[_v][id].restore.filter and "Y" or "N"))
+        screen.text("filter: "..(snapshots[_v][id].restore.post_filter_fc and "Y" or "N"))
         screen.level(_fm_.scene_line_sel == 7 and 15 or 3)
         screen.move(62,60)
-        screen.text("lfo: "..(snapshots[_v][id].restore.filter and "Y" or "N"))
+        screen.text("lfo: "..(snapshots[_v][id].restore.lfo and "Y" or "N"))
       end
     elseif _fm_.main_sel == 3 then
       screen.level(15)
@@ -287,9 +291,9 @@ function f_m.process_encoder(n,d)
         elseif _fm_.scene_line_sel == 4 then
           snapshots[_v][id].restore.end_point = d > 0 and true or false
         elseif _fm_.scene_line_sel == 5 then
-          snapshots[_v][id].restore.level = d > 0 and true or false
+          snapshots[_v][id].restore.vol = d > 0 and true or false
         elseif _fm_.scene_line_sel == 6 then
-          snapshots[_v][id].restore.filter = d > 0 and true or false
+          snapshots[_v][id].restore.post_filter_fc = d > 0 and true or false
         end
       end
     elseif _fm_.main_sel == 3 then

@@ -50,21 +50,15 @@ function ca.load_sample(file,sample,summed)
       {1,softcut_offsets[3],clip[sample].sample_length + 0.05 + softcut_offsets[3]},
       {2,softcut_offsets[4],clip[sample].sample_length + 0.05 + softcut_offsets[4]},
     }
-    softcut.buffer_clear_region_channel(scaled[sample][1],scaled[sample][2],global_duration)
-    softcut.buffer_read_mono(file, 0, scaled[sample][2], clip[sample].sample_length + 0.05, im_ch, scaled[sample][1])
+
+    -- TODO GENERALIZE:
+    set_softcut_param('buffer clear',{scaled[sample][1],scaled[sample][2],global_duration})
+    set_softcut_param('buffer read file',{file, 0, scaled[sample][2], clip[sample].sample_length + 0.05, im_ch, scaled[sample][1]})
+    -- //
+
     track[sample].end_point = (clip[sample].sample_length-0.01) + softcut_offsets[sample]
     track[sample].queued.end_point = track[sample].end_point
-    -- softcut.enable(sample, 1)
-    -- track[sample].playing = true
-    -- softcut.poll_start_phase()
-    softcut.rec_level(sample,0)
-    -- softcut.level(sample, params:get("vol_"..sample))
-    -- softcut.loop_start(sample,track[sample].start_point)
-    -- softcut.loop_end(sample,track[sample].end_point)
-    -- softcut.position(sample,track[sample].start_point)
-    -- softcut.rate(sample,get_total_pitch_offset(sample))
-    -- softcut.play(sample, 1)
-    -- chitter_stretch[sample].pos = track[sample].start_point
+    set_softcut_param('rec_level',sample,0)
     if params:string("transport_start_play_voice_"..sample) == "no" then
       play_voice(sample)
     end
@@ -74,6 +68,20 @@ function ca.load_sample(file,sample,summed)
   if params:get("clip "..sample.." sample") ~= file then
     params:set("clip "..sample.." sample", file, 1)
   end
+end
+
+function ca.set_level(voice,l)
+  local R_distributed = util.linlin(-1,1,0,l,params:get("pan_"..voice))
+  local L_distributed = util.linlin(0,l,l,0,R_distributed)
+  softcut.level(voice, L_distributed)
+  softcut.level(voice+2, R_distributed)
+end
+
+function ca.set_pan(voice,p)
+  local R_distributed = util.linlin(-1,1,0,params:get("vol_"..voice),p)
+  local L_distributed = util.linlin(0,params:get("vol_"..voice),params:get("vol_"..voice),0,R_distributed)
+  softcut.level(voice, L_distributed)
+  softcut.level(voice+2, R_distributed)
 end
 
 function ca.clock_try()

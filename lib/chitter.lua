@@ -27,7 +27,7 @@ function chitter.init_params()
           clock.cancel(chitter_stretch[i].clock)
           chitter_stretch[i].enabled = false
           chitter_stretch[i].clock = nil
-          softcut.fade_time(i,0.01)
+          set_softcut_param('fade_time',i,0.01)
           track[i].chitter_stretch = false
         end
         params:hide("chittering_step_"..i)
@@ -104,7 +104,7 @@ function chitter.init_params()
     params:add_number("chittering_fade_"..i,"    fade",0,300,1, function(param) return ((param:get()/100).."s") end)
     params:set_action("chittering_fade_"..i, function(x)
       chitter_stretch[i].fade_time = x
-      softcut.fade_time(i,x/100)
+      set_softcut_param('fade_time',i,x/100)
     end)
   end
 end
@@ -114,7 +114,7 @@ function chitter.stretch(i)
     clock.sleep((1/chitter_stretch[i].time)*clock.get_beat_sec())
     -- clock.sync(1/chitter_stretch[i].time)
     if chitter_stretch[i].enabled and not clear[i] then
-      softcut.position(i, chitter_stretch[i].pos)
+      set_softcut_param('position',i,chitter_stretch[i].pos)
       if chitter_stretch[i].pos + ((1/chitter_stretch[i].inc)*clock.get_beat_sec()) > (track[i].end_point - (chitter_stretch[i].fade_time/100))then
         chitter_stretch[i].pos = track[i].start_point - ((1/chitter_stretch[i].inc)*clock.get_beat_sec())
       end
@@ -173,9 +173,9 @@ function chitter.toggle(i) -- this shouldn't call/cancel clock, it should gate i
       track[i].chitter_stretch = false
     end
     chitter_stretch[i].clock = nil
-    softcut.fade_time(i,0.01)
+    set_softcut_param('fade_time',i,0.01)
   else
-    softcut.fade_time(i,chitter_stretch[i].fade_time/100)
+    set_softcut_param('fade_time',i,chitter_stretch[i].fade_time/100)
     chitter_stretch[i].pos = bank[i][bank[i].id].start_point
     chitter_stretch[i].clock = clock.run(chitter.stretch,i)
     chitter_stretch[i].enabled = true
@@ -186,7 +186,7 @@ end
 function chitter.change(i,param,d)
   chitter_stretch[i][param] = util.clamp(chitter_stretch[i][param]+d,1,100)
   if param == "fade_time" then
-    softcut.fade_time(i,util.clamp(chitter_stretch[i][param]+d/100,0.01,32))
+    set_softcut_param('fade_time',i,util.clamp(chitter_stretch[i][param]+d/100,0.01,32))
   end
 end
 
@@ -225,20 +225,18 @@ function chitter.scale_sample_to_main(i)
     -- chitter_stretch[i].time = 100
     -- chitter_stretch[i].inc = scale
     chitter_stretch[i].fade_time = params:get("chittering_fade_"..i)
-    softcut.fade_time(i,chitter_stretch[i].fade_time/100)
+    set_softcut_param('fade_time',i,chitter_stretch[i].fade_time/100)
   end
 end
 
 function chitter.cheat(i)
   local pad = bank[i][bank[i].id]
   if not chitter_stretch[i].enabled then
-    softcut.fade_time(i,0.01)
+    set_softcut_param('fade_time',i,0.01)
     if pad.rate > 0 then
-      -- softcut.position(b+1,pad.start_point+0.05)
-      softcut.position(i,pad.start_point+0.01)
+      set_softcut_param('position',i,pad.start_point+0.01)
     elseif pad.rate < 0 then
-        -- softcut.position(b+1,pad.end_point-0.01-0.05)
-      softcut.position(i,pad.end_point-0.01-0.01)
+      set_softcut_param('position',i,pad.end_point-0.01-0.01)
     end
   else
     if pad.rate > 0 then

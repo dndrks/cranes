@@ -43,7 +43,7 @@ _pat = include 'lib/patterns'
 _loop = include 'lib/loop'
 _cue = include 'lib/queue'
 
-engine.name="SimpleDelay"
+-- engine.name="SimpleDelay"
 osc.event = osc_in
 
 DATA_DIR = _path.data.."cranes/"
@@ -72,8 +72,9 @@ for i = 1,4 do
       rate_ramp = false,
       start_point = true,
       end_point = true,
-      level = true,
-      filter = true,
+      vol = true,
+      pan = true,
+      post_filter_fc = true,
       lfo = true
     }
   end
@@ -83,7 +84,7 @@ snapshot_count = {0,0,0,0}
 selected_snapshot = {0,0,0,0}
 snapshot_mod = {["index"] = 0, ["held"] = {false,false,false,false,false,false}}
 
-softcut_offsets = {1,1,101,101}
+softcut_offsets = {1,1,101,201}
 global_duration = 60
 
 track = {}
@@ -102,7 +103,7 @@ for i=1,4 do
   track[i].snapshot = {["partial_restore"] = false}
   track[i].snapshot.restore_times = {["beats"] = {1,2,4,8,16,32,64,128}, ["time"] = {1,2,4,8,16,32,64,128}, ["mode"] = "beats"}
   track[i].snapshot.mod_index = 0
-  track[i].snapshot.focus = 0
+  track[i].snapshot.focus = 1
   track[i].reverse = false
 end
 
@@ -125,10 +126,65 @@ for i = 1,4 do
   end
 end
 
+function set_softcut_param(param,args,val)
+  if param == 'level_input_cut' then
+    
+  elseif param == 'level_cut_cut' then
+    softcut[param](args[1],args[2],val)
+    if args[2] > 2 then
+      softcut[param](args[1],args[2]+2,val)
+    end
+  elseif param == 'buffer clear' then
+    if args[2] > 100 then
+      softcut.buffer_clear_region(args[2],args[3])
+    else
+      softcut.buffer_clear_region_channel(args[1],args[2],args[3])
+    end
+  elseif param == 'buffer read file' then
+    if args[3] > 100 then
+      softcut.buffer_read_stereo(args[1], args[2], args[3], args[4])
+    else
+      softcut.buffer_read_mono(table.unpack(args))
+    end
+  elseif param == 'pan' then
+    if args > 2 then
+      local R_distributed = util.linlin(-1,1,0,params:get("vol_"..args),val)
+      local L_distributed = util.linlin(0,params:get("vol_"..args),params:get("vol_"..args),0,R_distributed)
+      softcut.level(args, L_distributed)
+      softcut.level(args+2, R_distributed)
+    else
+      softcut[param](args,val)
+    end
+  elseif param == 'level' then
+    if args > 2 then
+      local R_distributed = util.linlin(-1,1,0,val,params:get("pan_"..args))
+      local L_distributed = util.linlin(0,val,val,0,R_distributed)
+      softcut.level(args, L_distributed)
+      softcut.level(args+2, R_distributed)
+    else
+      softcut[param](args,val)
+    end
+  elseif param == 'position' then
+    softcut[param](args,val)
+    softcut.voice_sync(args+2,args,0)
+  else
+    softcut[param](args,val)
+    if args > 2 then
+      softcut[param](args+2,val)
+    end
+  end
+end
+
 function init()
   _pat.init()
   _cue.init()
   g = grid.connect()
+
+  _ca.init()
+  _params.init()
+  _flow.init()
+  _song.init()
+  _time.init()
 
   softcut.buffer_clear()
   --audio.level_cut(1)
@@ -136,39 +192,48 @@ function init()
   audio.level_eng_cut(0)
   softcut.level_input_cut(1, 1, 1.0)
   softcut.level_input_cut(1, 2, 0.0)
+  softcut.level_input_cut(1, 3, 1.0)
+  softcut.level_input_cut(1, 4, 1.0)
+  softcut.level_input_cut(1, 5, 0.0)
+  softcut.level_input_cut(1, 6, 0.0)
   softcut.level_input_cut(2, 1, 0.0)
   softcut.level_input_cut(2, 2, 1.0)
+  softcut.level_input_cut(2, 3, 0.0)
+  softcut.level_input_cut(2, 4, 0.0)
+  softcut.level_input_cut(2, 5, 1.0)
+  softcut.level_input_cut(2, 6, 1.0)
   softcut.buffer(1,1)
   softcut.buffer(2,2)
   softcut.buffer(3,1)
-  softcut.buffer(4,2)
-  softcut.enable(5,0)
-  softcut.enable(6,0)
+  softcut.buffer(4,1)
+  softcut.buffer(5,2)
+  softcut.buffer(6,2)
   
-  for i = 1, 4 do
-    softcut.level(i,1.0)
-    softcut.play(i, 1) -- TODO CONFIRM GOOD
-    softcut.rate(i, 1)
-    softcut.loop_start(i, softcut_offsets[i])
-    softcut.loop_end(i, global_duration+softcut_offsets[i])
-    softcut.loop(i, 1)
-    softcut.fade_time(i, 0.015)
-    softcut.recpre_slew_time(i,0.015)
-    softcut.rec(i, 1) -- TODO CONFIRM GOOD
-    softcut.rec_level(i, 0)
-    softcut.pre_level(i, 1)
-    softcut.position(i, softcut_offsets[i])
-    softcut.phase_quant(i, 0.01)
-    softcut.rec_offset(i, -0.0003)
+  for i = 1,4 do
+    set_softcut_param('level',i,1.0)
+    set_softcut_param('play',i,1)
+    set_softcut_param('rate',i,1)
+    set_softcut_param('loop_start',i,softcut_offsets[i])
+    set_softcut_param('loop_end',i,global_duration+softcut_offsets[i])
+    set_softcut_param('loop',i,1)
+    set_softcut_param('fade_time',i,0.015)
+    set_softcut_param('recpre_slew_time',i,0.015)
+    set_softcut_param('rec',i,1) -- TODO CONFIRM GOOD
+    set_softcut_param('rec_level',i,0)
+    set_softcut_param('pre_level',i,1)
+    set_softcut_param('position',i,softcut_offsets[i])
+    set_softcut_param('phase_quant',i,0.01)
+    set_softcut_param('rec_offset',i,-0.0003)
   end
+
+  softcut.pan(1,-1)
+  softcut.pan(2,1)
+  softcut.pan(3,-1)
+  softcut.pan(4,-1)
+  softcut.pan(5,1)
+  softcut.pan(6,1)
  
   softcut.event_phase(phase)
-
-  _ca.init()
-  _params.init()
-  _flow.init()
-  _song.init()
-  _time.init()
   
   -- counter = metro.init(count, 0.005, -1)
   counter = {}
@@ -207,13 +272,6 @@ function init()
 
   grid_dirty = true
   screen_dirty = true
-  
-  -- softcut.poll_start_phase()
-
-  -- softcut.pre_filter_dry(1,1)
-  -- softcut.pre_filter_dry(2,1)
-  -- softcut.pre_filter_dry(3,1)
-  -- softcut.pre_filter_dry(4,1)
 
   -- dev
   for i = 1,4 do
@@ -222,9 +280,9 @@ function init()
     params:set("rec_disable_voice_"..i, 2)
     track[i].end_point = softcut_offsets[i]+8
     track[i].queued.end_point = track[i].end_point
-    softcut.enable(i,1)
+    set_softcut_param('enable',i,1)
   end
-  engine.threshold(-30)
+  -- engine.threshold(-30)
 end
 
 function get_total_pitch_offset(_t)
@@ -261,26 +319,28 @@ function draw_hardware()
 end
 
 function phase(n, x)
-  if track[n].playing then
-    track[n].poll_position = x
-    if rec[n] and clear[n] then
-      if x > track[n].rec_limit then
-        track[n].rec_limit = x
+  if n <= 4 then
+    if track[n].playing then
+      track[n].poll_position = x
+      if rec[n] and clear[n] then
+        if x > track[n].rec_limit then
+          track[n].rec_limit = x
+        end
+      elseif rec[n] and not clear[n] then
+        if (x > track[n].rec_limit) and (track[n].end_point > track[n].rec_limit) then
+          track[n].rec_limit = track[n].end_point
+        end
       end
-    elseif rec[n] and not clear[n] then
-      if (x > track[n].rec_limit) and (track[n].end_point > track[n].rec_limit) then
-        track[n].rec_limit = track[n].end_point
+      pp[n] = ((x - track[n].start_point) / (track[n].end_point - track[n].start_point))
+      x = math.floor(pp[n] * 8)
+      -- x = math.floor(util.round(pp[n],0.01) * 8)
+      -- x = util.round(util.round(pp[n],0.01) * 8,1)
+      if x ~= track[n].pos_grid then
+        track[n].pos_grid = x
       end
+      grid_dirty = true
+      screen_dirty = true
     end
-    pp[n] = ((x - track[n].start_point) / (track[n].end_point - track[n].start_point))
-    x = math.floor(pp[n] * 8)
-    -- x = math.floor(util.round(pp[n],0.01) * 8)
-    -- x = util.round(util.round(pp[n],0.01) * 8,1)
-    if x ~= track[n].pos_grid then
-      track[n].pos_grid = x
-    end
-    grid_dirty = true
-    screen_dirty = true
   end
 end
 
@@ -295,38 +355,32 @@ function warble()
     else
       ray = bufSpeed + (math.random(-2,2)/1000)
   end
-  softcut.rate_slew_time(voice_on_screen,0.6 + (math.random(-30,10)/100))
+  set_softcut_param('rate_slew_time',voice_on_screen,0.6 + (math.random(-30,10)/100))
 end
 
 function half_speed()
   ray = speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)] / 2
-  softcut.rate_slew_time(voice_on_screen,0.6 + (math.random(-30,10)/100))
+  set_softcut_param('rate_slew_time',voice_on_screen,0.6 + (math.random(-30,10)/100))
 end
 
 function rev_speed()
   ray = speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)] * -1
-  softcut.rate_slew_time(voice_on_screen,0.01)
+  set_softcut_param('rate_slew_time',voice_on_screen,0.01)
 end
 
 function oneandahalf_speed()
   ray = speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)] * 1.5
-  softcut.rate_slew_time(voice_on_screen,0.6 + (math.random(-30,10)/100))
+  set_softcut_param('rate_slew_time',voice_on_screen,0.6 + (math.random(-30,10)/100))
 end
 
 function double_speed()
   ray = speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)] * 2
-  softcut.rate_slew_time(voice_on_screen,0.6 + (math.random(-30,10)/100))
+  set_softcut_param('rate_slew_time',voice_on_screen,0.6 + (math.random(-30,10)/100))
 end
 
 function restore_speed()
   ray = speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)]
-  -- if params:get("KEY3") == 2 then
-  --   softcut.rate_slew_time(voice_on_screen,0.01)
-  -- else
-  --   softcut.rate_slew_time(voice_on_screen,0.6)
-  -- end
-  -- softcut.rate(voice_on_screen,speedlist[voice_on_screen][params:get("speed_voice_"..voice_on_screen)]*offset[voice_on_screen])
-  softcut.rate(voice_on_screen, get_total_pitch_offset(voice_on_screen))
+  set_softcut_param('rate_slew_time',voice_on_screen,get_total_pitch_offset(voice_on_screen))
 end
 
 -- variable dump
@@ -382,13 +436,14 @@ function key(n,z)
         song_menu = true
         key1_hold = false
       end
-    end
     
     -- KEY 3
     -- all based on Parameter choice
-    if n == 3 then
+    elseif n == 3 then
       if key1_hold then
         _time.process_key(_t,n,z)
+      elseif key2_hold and queue_menu.active then
+        _loop.jump_to_cue(_t)
       else
         if z == 1 then
           if _t == 1 or _t == 2 then
@@ -406,11 +461,10 @@ function key(n,z)
         end
       end
       key3_hold = z == 1 and true or false
-    end
 
     -- KEY 1
     -- hold key 1 + key 3 to clear the buffers
-    if n == 1 and z == 1 and KEY3_hold == true then
+    elseif n == 1 and z == 1 and KEY3_hold == true then
       _loop.clear_track(_t)
       key1_hold = false
     elseif n == 1 and z == 1 then
@@ -476,7 +530,7 @@ function redraw()
       
       if queue_menu.active then
         screen.move(0,30)
-        screen.text(key2_hold and "ehehehe" or "")
+        screen.text(key2_hold and "K3: jump to cue points" or "")
         screen.move(0,40)
         screen.level(queue_menu.sel == 1 and 15 or 3)
         screen.text("move cue window ("..params:string("queue_window_quant_voice_".._t)..")")
@@ -487,8 +541,6 @@ function redraw()
         screen.level(queue_menu.sel == 3 and 15 or 3)
         screen.text("(cue) e".._t..": "..util.round(track[_t].queued.end_point - softcut_offsets[_t],0.01).."s")
       else
-        screen.move(0,30)
-        screen.text(key2_hold and "ehehehe" or "")
         screen.move(0,40)
         screen.text("o".._t..": "..over[_t])
         screen.move(0,50)
@@ -628,7 +680,7 @@ function event_exec(e)
       if params:string("chittering_mode_".._t) ~= "off" then
         chitter_stretch[_t].pos = _cutposition
       else
-        softcut.position(_t,_cutposition)
+        set_softcut_param('position',_t,_cutposition)
       end
     end
   elseif e.section == "SNAP" then
@@ -641,16 +693,16 @@ function event_exec(e)
 end
 
 function play_voice(_t)
-  -- softcut.enable(_t, 1)
+  print(_t)
   track[_t].playing = true
   softcut.poll_start_phase()
-  softcut.level(_t,params:get("vol_".._t))
-  softcut.loop_start(_t,track[_t].start_point)
-  softcut.loop_end(_t,track[_t].end_point)
-  softcut.position(_t,track[_t].start_point)
-  softcut.rate_slew_time(_t,0.01)
-  softcut.rate(_t, get_total_pitch_offset(_t)) -- TODO CONFIRM THIS IS OKAY
-  softcut.play(_t, 1)
+  set_softcut_param('level',_t,params:get("vol_".._t))
+  set_softcut_param('loop_start',_t,track[_t].start_point)
+  set_softcut_param('loop_end',_t,track[_t].end_point)
+  set_softcut_param('position',_t,track[_t].start_point)
+  set_softcut_param('rate_slew_time',_t,0.01)
+  set_softcut_param('rate',_t, get_total_pitch_offset(_t)) -- TODO CONFIRM THIS IS OKAY
+  set_softcut_param('play',_t,1)
   chitter_stretch[_t].pos = track[_t].start_point
   screen_dirty = true
   grid_dirty = true

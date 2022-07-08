@@ -1,186 +1,453 @@
+local frm = require 'formatters'
+
 local lfos = {}
 
-lfos.NUM_LFOS = 12
-lfos.LFO_MIN_TIME = 1 -- Secs
-lfos.LFO_MAX_TIME = 60 * 60 * 24
-lfos.LFO_UPDATE_FREQ = 128
-lfos.LFO_RESOLUTION = 128 -- MIDI CC resolution
-lfos.lfo_freqs = {}
-lfos.lfo_progress = {}
-lfos.lfo_values = {}
+lfos.max_per_group = 8
 
-local lfo_rates = {1/16,1/8,1/4,5/16,1/3,3/8,1/2,3/4,1,1.5,2,3,4,6,8,16,32,64,128,256,512,1024}
-local scaled_output = {["vol_"] = {0,1,0.5}, ["pan_"] = {-1,1,0}, ["post_filter_fc_"] = {900,4000,1550}}
-local ivals = {["vol_"] = {1,4}, ["pan_"] = {5,8}, ["post_filter_fc_"] = {9,12}}
-local min_specs = {
-  ["vol_"] = {0,5,'lin',0.01,0,'',0.01}, --min, max, warp, step, default, units, quantum, wrap
-  ["pan_"] = {-1,1,'lin',0.01,-1,'',0.01},
-  ["post_filter_fc_"] = {20,12000,'exp',0.01,20,'',0.01}
-}
-local max_specs = {
-  ["vol_"] = {0,5,'lin',0.01,1,'',0.01}, --min, max, warp, step, default, units, quantum, wrap
-  ["pan_"] = {-1,1,'lin',0.01,1,'',0.01},
-  ["post_filter_fc_"] = {20,12000,'exp',0.01,12000,'',0.01}
-}
+local function new_lfo_table()
+  return
+  {
+    available = lfos.max_per_group,
+    parent_group = {},
+    targets = {},
+    actions = {},
+    progress = {},
+    freqs = {},
+    values = {},
+    rand_values = {},
+    update = {},
+    counter = nil,
+    param_types = {},
+  }
+end
 
--- lfos 1-4: vol_
--- lfos 5-8: pan_
--- lfos 9-12: post_filter_fc_
+lfos.groups = {}
+lfos.parent_strings = {}
 
-function lfos.add_params(style)
-  if style == "pan_" then
-    params:add_group("pan lfos",36)
-  elseif style == "vol_" then
-    params:add_group("output level lfos",36)
-  elseif style == "post_filter_fc_" then
-    params:add_group("filter cutoff lfos",36)
+lfos.rates = {1/16,1/8,1/4,5/16,1/3,3/8,1/2,3/4,1,1.5,2,3,4,6,8,16,32,64,128,256,512,1024}
+lfos.rates_as_strings = {"1/16","1/8","1/4","5/16","1/3","3/8","1/2","3/4","1","1.5","2","3","4","6","8","16","32","64","128","256","512","1024"}
+
+local update_freq = 128
+local main_header_added = false
+local clock_action_appended = false
+local tempo_updater_clock;
+local lfos_all_loaded = {}
+
+local function lfo_params_visibility(state, group, i)
+  if lfos_all_loaded[group] then
+    params[state](params, "lfo position "..group.." "..i)
+    params[state](params, "lfo depth "..group.." "..i)
+    params[state](params, "lfo mode "..group.." "..i)
+    if state == "show" then
+      if params:get("lfo mode "..group.." "..i) == 1 then
+        params:hide("lfo free "..group.." "..i)
+        params:show("lfo bars "..group.." "..i)
+      elseif params:get("lfo mode "..group.." "..i) == 2 then
+        params:hide("lfo bars "..group.." "..i)
+        params:show("lfo free "..group.." "..i)
+      end
+    else
+      params:hide("lfo bars "..group.." "..i)
+      params:hide("lfo free "..group.." "..i)
+    end
+    params[state](params, "lfo shape "..group.." "..i)
+    params[state](params, "lfo min "..group.." "..i)
+    params[state](params, "lfo max "..group.." "..i)
+    params[state](params, "lfo reset "..group.." "..i)
+    params[state](params, "lfo reset target "..group.." "..i)
+    _menu.rebuild_params()
   end
-  for i = ivals[style][1],ivals[style][2] do
-    local _di = util.wrap(i,1,4)
-    params:add_separator("voice ".._di)
-    params:add_option("lfo_"..style..i,"lfo",{"off","on"},1)
-    params:set_action("lfo_"..style..i,function(x)
-      lfos.sync_lfos(i,style)
+end
+
+local function return_param_to_baseline(group,i)
+  -- when an LFO is turned off, the affected parameter will return to its pre-enabled value,
+  --   if it was registered with 'param action'
+  params:lookup_param(lfos.groups[group].targets[i]):bang()
+end
+
+local function get_lfo_spec(group,i,bound)
+  local lfo_target = lfos.groups[group].targets[i]
+  local param_spec = params:lookup_param(lfo_target)
+
+  -- number:
+  if param_spec.t == 1 then
+    return {
+      spec = controlspec.new(
+        param_spec.min,
+        param_spec.max,
+        'lin',
+        0,
+        (bound == nil and param_spec.value or (bound == 'min' and param_spec.min or (bound == 'current' and params:get(lfo_target) or param_spec.max))),
+        nil,
+        (param_spec.t == 1 and 1/(param_spec.max - param_spec.min) or 1),
+        param_spec.wrap
+      ),
+      formatter = function(param) return(
+        (util.round(param:get(),1))
+      ) end
+    }
+  -- option:
+  elseif param_spec.t == 2 then
+    return {
+      spec = controlspec.new(
+        1,
+        param_spec.count,
+        'lin',
+        1,
+        (bound == nil and param_spec.value or (bound == 'min' and 1 or (bound == 'current' and params:get(lfo_target) or param_spec.count))),
+        nil,
+        1/(param_spec.count-1)
+      ),
+      formatter = function(param) return(
+        param_spec.options[param:get()]
+      ) end
+    }
+  -- control:
+  elseif param_spec.t == 3 then
+    return {
+      spec = controlspec.new(
+        param_spec.controlspec.minval,
+        param_spec.controlspec.maxval,
+        param_spec.controlspec.warp,
+        param_spec.controlspec.step,
+        (bound == nil and param_spec.controlspec.default or (bound == 'min' and param_spec.controlspec.minval or (bound == 'current' and params:get(lfo_target) or param_spec.controlspec.maxval))),
+        param_spec.controlspec.units,
+        param_spec.controlspec.quantum,
+        param_spec.controlspec.wrap
+      ),
+      formatter = param_spec.formatter
+    }
+  -- taper:
+  elseif param_spec.t == 5 then
+    return {
+      spec = controlspec.new(
+        (param_spec.t == 1 and param_spec.min or 1),
+        (param_spec.t == 1 and param_spec.max or param_spec.count),
+        'lin',
+        0,
+        (bound == nil and param_spec.value or (bound == 'min' and param_spec.min or (bound == 'current' and params:get(lfo_target) or param_spec.max))),
+        nil,
+        (param_spec.t == 1 and 1/(param_spec.max - param_spec.min) or 1),
+        param_spec.wrap
+      ),
+      formatter = function(param)
+        local v = param:get()
+        local absv = math.abs(v)
+      
+        if absv >= 100 then
+          format = "%.0f "..string.gsub(self.units, "%%", "%%%%")
+        elseif absv >= 10 then
+          format = "%.1f "..string.gsub(self.units, "%%", "%%%%")
+        elseif absv >= 1 then
+          format = "%.2f "..string.gsub(self.units, "%%", "%%%%")
+        elseif absv >= 0.001 then
+          format = "%.3f "..string.gsub(self.units, "%%", "%%%%")
+        else
+          format = "%.0f "..string.gsub(self.units, "%%", "%%%%")
+        end
+      
+        return string.format(format, v)
+      end
+    }
+  -- binary:
+  elseif param_spec.t == 9 then
+    return {
+      spec = controlspec.new(
+        0,
+        1,
+        'lin',
+        1,
+        (bound == nil and param_spec.value or (bound == 'min' and 0 or (bound == 'current' and params:get(lfo_target) or 1))),
+        nil,
+        1,
+        nil
+      ),
+      formatter = function(param) return(
+        param:get() == 1 and "on" or "off")
+      end
+    }
+  end
+end
+
+local function update_lfo_freqs(group)
+  for i = 1,#lfos.groups[group].targets do
+    lfos.groups[group].freqs[i] = 1 / util.linexp(1, #lfos.groups[group].targets, 1, 1, i)
+  end
+end
+
+local function reset_lfo_phase(group,which)
+  if which == nil then
+    for i = 1, #lfos.groups[group].targets do
+      lfos.groups[group].progress[i] = math.pi * (params:string("lfo reset target "..group.." "..i) == "floor" and 1.5 or 2.5)
+    end
+  else
+    lfos.groups[group].progress[which] = math.pi * (params:string("lfo reset target "..group.." "..which) == "floor" and 1.5 or 2.5)
+  end
+end
+
+local function get_beat_time()
+  return 60 / params:get("clock_tempo")
+end
+
+local function sync_lfos(group, i)
+  if params:get("lfo mode "..group.." "..i) == 1 then
+    lfos.groups[group].freqs[i] = 1/(get_beat_time() * lfos.rates[params:get("lfo bars "..group.." "..i)] * 4)
+  else
+    lfos.groups[group].freqs[i] = params:get("lfo free "..group.." "..i)
+  end
+end
+
+local function process_lfo(group)
+  local delta = (1 / update_freq) * 2 * math.pi
+  local lfo_parent = lfos.groups[group]
+  if lfos_all_loaded[group] then
+    for i = 1,#lfo_parent.targets do
+      
+      local _t = i
+      lfo_parent.progress[i] = lfo_parent.progress[i] + delta * lfo_parent.freqs[i]
+      local min = params:get("lfo min "..group.." "..i)
+      local max = params:get("lfo max "..group.." "..i)
+      if min > max then
+        local old_min = min
+        local old_max = max
+        min = old_max
+        max = old_min
+      end
+
+      local mid = (min+max)/2
+      local percentage = math.abs(min-max) * (params:get("lfo depth "..group.." "..i)/100)
+
+      local scaled_min = min
+      local scaled_max = min + percentage
+      local value = util.linlin(-1,1,scaled_min,scaled_max,math.sin(lfo_parent.progress[i]))
+      mid = util.linlin(min,max,scaled_min,scaled_max,mid)
+
+      if value ~= lfo_parent.values[i] and (params:get("lfo depth "..group.." "..i)/100 > 0) then
+        lfo_parent.values[i] = value
+        if params:string("lfo "..group.." "..i) == "on" then
+
+          if params:string("lfo position "..group.." "..i) == 'from center' then
+            mid = (min+max)/2
+            local centroid_mid = math.abs(min-max) * ((params:get("lfo depth "..group.." "..i)/100)/2)
+            scaled_min = mid - centroid_mid
+            scaled_max = mid + centroid_mid
+            value = util.linlin(-1,1,scaled_min, scaled_max, math.sin(lfo_parent.progress[i]))
+          elseif params:string("lfo position "..group.." "..i) == 'from max' then
+            mid = (min+max)/2
+            value = max - value
+            scaled_min = max - (math.abs(min-max) * (params:get("lfo depth "..group.." "..i)/100))
+            scaled_max = max
+            mid = math.abs(util.linlin(min,max,scaled_min,scaled_max,mid))
+            value = util.linlin(-1,1,scaled_min, scaled_max, math.sin(lfo_parent.progress[i]))
+          elseif params:string("lfo position "..group.." "..i) == 'from current' then
+            mid = params:get(lfo_parent.targets[i])
+            local centroid_mid = math.abs(min-max) * ((params:get("lfo depth "..group.." "..i)/100)/2)
+            scaled_min = mid - centroid_mid
+            scaled_max = mid + centroid_mid
+            value = util.linlin(-1,1,scaled_min, scaled_max, math.sin(lfo_parent.progress[i]))
+          end
+
+          if params:string("lfo shape "..group.." "..i) == "sine" then
+            if lfo_parent.param_types[i] == 1 or lfo_parent.param_types[i] == 2 or lfo_parent.param_types[i] == 9 then
+              value = util.round(value,1)
+            end
+            value = util.clamp(value,min,max)
+            lfo_parent.actions[lfo_parent.targets[i]](value)
+          elseif params:string("lfo shape "..group.." "..i) == "square" then
+            local square_value;
+            square_value = value >= mid and max or min
+            square_value = util.linlin(min,max,scaled_min,scaled_max,square_value)
+            square_value = util.clamp(square_value,min,max)
+            lfo_parent.actions[lfo_parent.targets[i]](square_value)
+          elseif params:string("lfo shape "..group.." "..i) == "random" then
+            local prev_value = lfo_parent.rand_values[i]
+            lfo_parent.rand_values[i] = value >= mid and max or min
+            local rand_value;
+            if prev_value ~= lfo_parent.rand_values[i] then
+              rand_value = util.linlin(min,max,scaled_min,scaled_max,math.random(math.floor(min*100),math.floor(max*100))/100)
+              if lfo_parent.param_types[i] == 1 or lfo_parent.param_types[i] == 2 or lfo_parent.param_types[i] == 9 then
+                rand_value = util.round(rand_value,1)
+              end
+              rand_value = util.clamp(rand_value,min,max)
+              lfo_parent.actions[lfo_parent.targets[i]](rand_value)
+            end
+          end
+
+        end
+      end
+    end
+  end
+end
+
+function lfos:register(param, parent_group, fn)
+
+  if self.groups[parent_group] == nil then
+    lfos.groups[parent_group] = new_lfo_table()
+    table.insert(lfos.parent_strings, parent_group)
+  end
+  if #self.groups[parent_group].targets < self.max_per_group then
+    table.insert(self.groups[parent_group].targets, param)
+    self.groups[parent_group].available = self.groups[parent_group].available - 1
+  else
+    print("LFO ERROR: limit of "..lfos.max_per_group.." entries per LFO group, ignoring "..parent_group.." / "..param)
+    goto done
+  end
+
+  if not fn or fn == 'map param' then
+    fn = function(val) params:set(param, val) end
+  elseif fn == 'param action' then
+    fn = function(val) params:lookup_param(param).action(val) end
+  end
+
+  self.groups[parent_group].actions[param] = fn
+
+  ::done::
+
+end
+
+function lfos:set_action(param, parent_group, fn)
+  self.groups[parent_group].actions[param] = fn
+end
+
+function lfos:add_params(parent_group, separator_name, silent)
+
+  if not main_header_added and separator_name ~= nil then
+    params:add_separator(separator_name)
+    main_header_added = true
+  end
+
+  local group = parent_group
+  params:add_group(group, 12 * #self.groups[group].targets)
+
+  for i = 1,#self.groups[group].targets do
+
+    self.groups[group].param_types[i] = params:lookup_param(self.groups[group].targets[i]).t
+
+    params:add_separator(params:lookup_param(self.groups[group].targets[i]).name)
+
+    params:add_option("lfo "..group.." "..i,"lfo",{"off","on"},1)
+    params:set_action("lfo "..group.." "..i,function(x)
+      sync_lfos(group, i)
       if x == 1 then
-        local default_value = params.params[params.lookup[style..util.wrap(i,1,4)]].controlspec.default
-        -- local default_value = max_specs[style][5]
-        params:set(style..util.wrap(i,1,4),default_value)
+        return_param_to_baseline(group, i)
+        lfo_params_visibility("hide", group, i)
+      elseif x == 2 then
+        lfo_params_visibility("show", group, i)
       end
     end)
-    params:add_option("lfo_mode_"..style..i, "lfo mode", {"beats","free"},1)
-    params:set_action("lfo_mode_"..style..i,
+    params:add_number("lfo depth "..group.." "..i,"depth",0,100,0,function(param) return (param:get().."%") end)
+    params:set_action("lfo depth "..group.." "..i, function(x)
+      if x == 0 then
+        return_param_to_baseline(group, i)
+      end
+    end)
+
+    params:add{
+      type='control',
+      id="lfo min "..group.." "..i,
+      name="lfo min",
+      controlspec = get_lfo_spec(group,i,"min").spec,
+      formatter =  get_lfo_spec(group,i).formatter
+    }
+
+    params:add{
+      type='control',
+      id="lfo max "..group.." "..i,
+      name="lfo max",
+      controlspec = get_lfo_spec(group,i,"max").spec,
+      formatter = get_lfo_spec(group,i).formatter
+    }
+
+    params:add_option("lfo position "..group.." "..i, "lfo position", {"from min", "from center", "from max", "from current"},1)
+
+    params:add_option("lfo mode "..group.." "..i, "lfo mode", {"bars","free"},1)
+    params:set_action("lfo mode "..group.." "..i,
       function(x)
-        if x == 1 then
-          params:hide("lfo_free_"..style..i)
-          params:show("lfo_beats_"..style..i)
-          lfos.lfo_freqs[i] = 1/(lfos.get_the_beats() * lfo_rates[params:get("lfo_beats_"..style..i)] * 4)
-        elseif x == 2 then
-          params:hide("lfo_beats_"..style..i)
-          params:show("lfo_free_"..style..i)
-          lfos.lfo_freqs[i] = params:get("lfo_free_"..style..i)
+        if x == 1 and params:string("lfo "..group.." "..i) == "on" then
+          params:hide("lfo free "..group.." "..i)
+          params:show("lfo bars "..group.." "..i)
+          self.groups[group].freqs[i] = 1/(get_beat_time() * self.rates[params:get("lfo bars "..group.." "..i)] * 4)
+        elseif x == 2 and params:string("lfo "..group.." "..i) == "on" then
+          params:hide("lfo bars "..group.." "..i)
+          params:show("lfo free "..group.." "..i)
+          self.groups[group].freqs[i] = params:get("lfo free "..group.." "..i)
         end
         _menu.rebuild_params()
       end
       )
-    params:add_option("lfo_beats_"..style..i, "lfo rate", {"1/16","1/8","1/4","5/16","1/3","3/8","1/2","3/4","1","1.5","2","3","4","6","8","16","32","64","128","256","512","1024"},9)
-    params:set_action("lfo_beats_"..style..i,
+    params:add_option("lfo bars "..group.." "..i, "lfo rate", self.rates_as_strings, 9)
+    params:set_action("lfo bars "..group.." "..i,
       function(x)
-        if params:string("lfo_mode_"..style..i) == "beats" then
-          lfos.lfo_freqs[i] = 1/(lfos.get_the_beats() * lfo_rates[x] * 4)
+        if params:string("lfo mode "..group.." "..i) == "bars" then
+          self.groups[group].freqs[i] = 1/(get_beat_time() * self.rates[x] * 4)
         end
       end
     )
     params:add{
       type='control',
-      id="lfo_free_"..style..i,
+      id="lfo free "..group.." "..i,
       name="lfo rate",
       controlspec=controlspec.new(0.001,4,'exp',0.001,0.05,'hz',0.001)
     }
-    params:set_action("lfo_free_"..style..i,
+    params:set_action("lfo free "..group.." "..i,
       function(x)
-        if params:string("lfo_mode_"..style..i) == "free" then
-          lfos.lfo_freqs[i] = x
+        if params:string("lfo mode "..group.." "..i) == "free" then
+          self.groups[group].freqs[i] = x
         end
       end
     )
-    params:add_option("lfo_shape_"..style..i, "lfo shape", {"sine","square","random"},1)
-    params:add{
-      type='control',
-      id="lfo_min_"..style..i,
-      name="lfo min",
-      controlspec=controlspec.new(min_specs[style][1],min_specs[style][2],min_specs[style][3],min_specs[style][4],min_specs[style][5],min_specs[style][6],min_specs[style][7])
-    }
-    params:add{
-      type='control',
-      id="lfo_max_"..style..i,
-      name="lfo max",
-      controlspec=controlspec.new(max_specs[style][1],max_specs[style][2],max_specs[style][3],max_specs[style][4],max_specs[style][5],max_specs[style][6],max_specs[style][7])
-    }
-    params:add_trigger("lfo_reset_"..style..i, "reset lfo")
-    params:set_action("lfo_reset_"..style..i, function(x) lfos.reset_phase(i) end)
-    params:hide("lfo_free_"..style..i)
-    if style == "vol_" then
-      vol_lfos_loaded = true
-    elseif style == "pan_" then
-      pan_lfos_loaded = true
-    elseif style == "post_filter_fc_" then
-      post_filter_fc_lfos_loaded = true
-    end
+    params:add_option("lfo shape "..group.." "..i, "lfo shape", {"sine","square","random"},1)
+    params:add_trigger("lfo reset "..group.." "..i, "reset lfo")
+    params:set_action("lfo reset "..group.." "..i, function(x) reset_lfo_phase(group,i) end)
+    params:add_option("lfo reset target "..group.." "..i, "reset lfo to", {"floor","ceiling"}, 1)
+    params:hide("lfo free "..group.." "..i)
   end
-  lfos.reset_phase()
-  lfos.update_freqs()
-  lfos.lfo_update()
-  metro.init(lfos.lfo_update, 1 / lfos.LFO_UPDATE_FREQ):start()
-end
 
-function lfos.update_freqs()
-  for i = 1, lfos.NUM_LFOS do
-    lfos.lfo_freqs[i] = 1 / util.linexp(1, lfos.NUM_LFOS, 1, 1, i)
+  lfos_all_loaded[group] = true
+  
+  if not silent then
+    params:bang()
   end
-end
 
-function lfos.reset_phase(which)
-  if which == nil then
-    for i = 1, lfos.NUM_LFOS do
-      lfos.lfo_progress[i] = math.pi * 1.5
-    end
-  else
-    lfos.lfo_progress[which] = math.pi * 1.5
+  self.groups[group].update = function()
+    process_lfo(group)
   end
-end
 
-function lfos.get_the_beats()
-  return 60 / params:get("clock_tempo")
-end
+  self.groups[group].counter = metro.init(self.groups[group].update, 1 / update_freq)
+  self.groups[group].counter:start()
 
-function lfos.sync_lfos(i,style)
-  if params:get("lfo_mode_"..style..i) == 1 then
-    lfos.lfo_freqs[i] = 1/(lfos.get_the_beats() * lfo_rates[params:get("lfo_beats_"..style..i)] * 4)
-  else
-    lfos.lfo_freqs[i] = params:get("lfo_free_"..style..i)
-  end
-end
+  reset_lfo_phase(group)
+  update_lfo_freqs(group)
 
-function lfos.lfo_update() -- 'pan_' or 'vol_'
-  if pan_lfos_loaded then
-    lfos.small("pan_")
-  end
-  if vol_lfos_loaded then
-    lfos.small("vol_")
-  end
-  if post_filter_fc_lfos_loaded then
-    lfos.small("post_filter_fc_")
-  end
-end
+  if not clock_action_appended then
+    local system_tempo_change_handler = params:lookup_param("clock_tempo").action
 
-function lfos.small(style)
-  local delta = (1 / lfos.LFO_UPDATE_FREQ) * 2 * math.pi
-  for i = ivals[style][1],ivals[style][2] do
-    local _t = util.round(util.linlin(ivals[style][1],ivals[style][2],1,4,i))
-    lfos.lfo_progress[i] = lfos.lfo_progress[i] + delta * lfos.lfo_freqs[i]
-    local min = params:get("lfo_min_"..style..i)
-    local max = params:get("lfo_max_"..style..i)
-    local mid = math.abs(min-max)/2
-    local value = util.linlin(-1,1,min,max,math.sin(lfos.lfo_progress[i]))
-    if value ~= lfos.lfo_values[i] then
-      lfos.lfo_values[i] = value
-      if params:string("lfo_"..style..i) == "on" then
-        if params:string("lfo_shape_"..style..i) == "sine" then
-          params:set(style.._t, value)
-        elseif params:string("lfo_shape_"..style..i) == "square" then
-          params:set(style.._t, value >= mid and max or min)
-        elseif params:string("lfo_shape_"..style..i) == "random" then
-          if value == min or value == max then
-            if min < max then
-              params:set(style.._t, math.random(util.round(min*100),util.round(max*100))/100)
-            else
-              params:set(style.._t, math.random(util.round(max*100),util.round(min*100))/100)
+    local lfo_change_handler = function(bpm)
+      system_tempo_change_handler(bpm)
+      if tempo_updater_clock then
+        clock.cancel(tempo_updater_clock)
+      end
+      tempo_updater_clock = clock.run(
+        function()
+          clock.sleep(0.05)
+          for k,v in pairs(self.groups) do
+            for i = 1,#lfos.groups[k].freqs do
+              sync_lfos(k, i)
             end
           end
         end
-      end
+      )
     end
+
+    params:set_action("clock_tempo", lfo_change_handler)
+    -- since clock params get rebuilt as part of a script clear,
+    --  it seems okay to append without re-establishing:
+    --  https://github.com/monome/norns/blob/main/lua/core/script.lua#L100
+
+    clock_action_appended = true
+
   end
+
 end
 
 return lfos

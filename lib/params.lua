@@ -1,5 +1,7 @@
 local _params = {}
 
+local frm = require 'formatters'
+
 function _params.init()
 
   params:add_separator("cranes")
@@ -14,12 +16,16 @@ function _params.init()
 
   params:add_separator("speed")
   for i = 1,4 do
-    params:add_option("speed_voice_"..i,"speed voice "..i, speedlist[1])
+    local sp_entries = {}
+    for k,v in pairs(speedlist[i]) do
+      sp_entries[k] = v..'x'
+    end
+    params:add_option("speed_voice_"..i,"speed ["..i.."]", sp_entries)
     params:set("speed_voice_"..i, 9)
     params:set_action("speed_voice_"..i,
       function(x)
-        -- softcut.rate(i, speedlist[i][params:get("speed_voice_"..i)]*offset[i])
-        softcut.rate(i, get_total_pitch_offset(i))
+        -- softcut.rate(i, get_total_pitch_offset(i))
+        set_softcut_param('rate',i,get_total_pitch_offset(i))
         if x < 6 then
           if not track[i].reverse then track[i].reverse = true end
         elseif x > 6 then
@@ -33,12 +39,12 @@ function _params.init()
   params:add_separator("offset")
   
   for i = 1,4 do
-    params:add_number("semitone_offset_"..i, "offset voice "..i, -24,24,0, function(param) return (param:get().." st") end)
+    params:add_number("semitone_offset_"..i, "offset ["..i.."]", -24,24,0, function(param) return (param:get().." st") end)
     params:set_action("semitone_offset_"..i,
       function(value)
         offset[i] = math.pow(0.5, -value / 12)
-        -- softcut.rate(i,speedlist[i][params:get("speed_voice_"..i)]*offset[i])
-        softcut.rate(i, get_total_pitch_offset(i))
+        -- softcut.rate(i, get_total_pitch_offset(i))
+        set_softcut_param('rate',i,get_total_pitch_offset(i))
       end
     )
   end
@@ -55,7 +61,8 @@ function _params.init()
   params:add_control("pitch_control","pitch control (global)",controlspec.new(-12,12,'lin',0,0,'%'))
   params:set_action("pitch_control",function(x)
     for i = 1,4 do
-      softcut.rate(i,get_total_pitch_offset(i))
+      -- softcut.rate(i,get_total_pitch_offset(i))
+      set_softcut_param('rate',i,get_total_pitch_offset(i))
     end
   end)
 
@@ -63,92 +70,102 @@ function _params.init()
   --
   params:add_separator("in")
   for i = 1,4 do
-    params:add_control("lvl_in_L_"..i, "lvl in L voice " .. i, controlspec.new(0,1,'lin',0,1,''))
-    params:set_action("lvl_in_L_"..i, function(x) softcut.level_input_cut(1, i, x) end)
+    params:add_control("lvl_in_L_"..i, "level in L ["..i.."]", controlspec.new(0,1,'lin',0,1,''), function(param) return(util.round(param:get() * 100,1).."%") end)
+    -- params:set_action("lvl_in_L_"..i, function(x) softcut.level_input_cut(1, i, x) end)
+    params:set_action("lvl_in_L_"..i, function(x) set_softcut_param('level_input_cut',{1,i},x) end)
   end
   params:set("lvl_in_L_"..2, 0.0)
   for i = 1,4 do
-    params:add_control("lvl_in_R_"..i, "lvl in R voice " .. i, controlspec.new(0,1,'lin',0,1,''))
-    params:set_action("lvl_in_R_"..i, function(x) softcut.level_input_cut(2, i, x) end)
+    params:add_control("lvl_in_R_"..i, "level in R ["..i.."]", controlspec.new(0,1,'lin',0,1,''), function(param) return(util.round(param:get() * 100,1).."%") end)
+    -- params:set_action("lvl_in_R_"..i, function(x) softcut.level_input_cut(2, i, x) end)
+    params:set_action("lvl_in_R_"..i, function(x) set_softcut_param('level_input_cut',{2,i},x) end)
   end
   params:set("lvl_in_R_"..1, 0.0)
 
   params:add_separator("out")
   for i = 1,4 do
-    params:add_control("vol_"..i,"lvl out voice "..i,controlspec.new(0,5,'lin',0,1,''))
-    params:set_action("vol_"..i, function(x) softcut.level(i, x) end)
+    params:add_control("vol_"..i,"level out ["..i.."]",controlspec.new(0,5,'lin',0,1,''), function(param) return(util.round(param:get() * 100,1).."%") end)
+    -- params:set_action("vol_"..i, function(x) softcut.level(i, x) end)
+    params:set_action("vol_"..i, function(x) set_softcut_param('level',i,x) end)
+    _lfos:register("vol_"..i, "levels", 'param action')
     -- params:set("vol_"..i, 1.0)
   end
 
   params:add_separator("cross")
   for i = 1,2 do
-    params:add_control("cross_"..i.."_3","feed ["..i.."] into [3]",controlspec.new(0,5,'lin',0,0,''))
+    params:add_control("cross_"..i.."_3","feed ["..i.."] into [3]",controlspec.new(0,5,'lin',0,0,''), function(param) return(util.round(param:get() * 100,1).."%") end)
     params:set_action("cross_"..i.."_3", function(x)
       if params:get("cross_3_"..i) ~= 0 then
         params:set("cross_3_"..i,0)
       end
-      softcut.level_cut_cut(i,3,x)
+      -- softcut.level_cut_cut(i,3,x)
+      set_softcut_param('level_cut_cut',{i,3},x)
     end)
-    params:add_control("cross_"..i.."_4","feed ["..i.."] into [4]",controlspec.new(0,5,'lin',0,0,''))
+    params:add_control("cross_"..i.."_4","feed ["..i.."] into [4]",controlspec.new(0,5,'lin',0,0,''), function(param) return(util.round(param:get() * 100,1).."%") end)
     params:set_action("cross_"..i.."_4", function(x)
       if params:get("cross_4_"..i) ~= 0 then
         params:set("cross_4_"..i,0)
       end
-      softcut.level_cut_cut(i,4,x)
+      -- softcut.level_cut_cut(i,4,x)
+      set_softcut_param('level_cut_cut',{i,4},x)
     end)
   end
   for i = 3,4 do
-    params:add_control("cross_"..i.."_1","feed ["..i.."] into [1]",controlspec.new(0,5,'lin',0,0,''))
+    params:add_control("cross_"..i.."_1","feed ["..i.."] into [1]",controlspec.new(0,5,'lin',0,0,''), function(param) return(util.round(param:get() * 100,1).."%") end)
     params:set_action("cross_"..i.."_1", function(x)
       if params:get("cross_1_"..i) ~= 0 then
         params:set("cross_1_"..i,0)
       end
-      softcut.level_cut_cut(i,1,x)
+      -- softcut.level_cut_cut(i,1,x)
+      set_softcut_param('level_cut_cut',{i,1},x)
     end)
-    params:add_control("cross_"..i.."_2","feed ["..i.."] into [2]",controlspec.new(0,5,'lin',0,0,''))
+    params:add_control("cross_"..i.."_2","feed ["..i.."] into [2]",controlspec.new(0,5,'lin',0,0,''), function(param) return(util.round(param:get() * 100,1).."%") end)
     params:set_action("cross_"..i.."_2", function(x)
       if params:get("cross_2_"..i) ~= 0 then
         params:set("cross_2_"..i,0)
       end
-      softcut.level_cut_cut(i,2,x)
+      -- softcut.level_cut_cut(i,2,x)
+      set_softcut_param('level_cut_cut',{i,2},x)
     end)
   end
-
-  _lfos.add_params("vol_")
 
   params:add_group("panning",12)
   for i = 1,4 do
     local _di = util.wrap(i,1,4)
     local pan_defaults = {-1,1,0,0}
     params:add_separator("voice ".._di)
-    params:add_control("pan_".._di,"pan",controlspec.new(-1,1,'lin',0.01,pan_defaults[_di],''))
-    params:set_action("pan_".._di, function(x) softcut.pan(_di, x) end)
-    params:add_control("pan_slew_".._di,"slew", controlspec.new(0, 20, "lin", 0.01, 1, ""))
-    params:set_action("pan_slew_".._di, function(x) softcut.pan_slew_time(_di, x) end)
+    params:add_control("pan_".._di,"pan [".._di.."]",controlspec.new(-1,1,'lin',0.01,pan_defaults[_di],''), frm.bipolar_as_pan_widget)
+    -- params:set_action("pan_".._di, function(x) softcut.pan(_di, x) end)
+    params:set_action("pan_".._di, function(x) set_softcut_param('pan',_di,x) end)
+    params:add_control("pan_slew_".._di,"slew [".._di.."]", controlspec.new(0, 20, "lin", 0.01, 0.3, ""))
+    -- params:set_action("pan_slew_".._di, function(x) softcut.pan_slew_time(_di, x) end)
+    params:set_action("pan_slew_".._di, function(x) set_softcut_param('pan_slew_time',_di,x) end)
+    _lfos:register("pan_"..i, "panning", 'param action')
   end
-
-  _lfos.add_params("pan_")
 
   params:add_group("filters",28)
-  --
-  -- local p = softcut.params() -- TODO VERIFY IF I NEED THIS?
   for i = 1,4 do
     params:add_separator("voice "..i)
-    params:add_control("post_filter_fc_"..i,"filter cutoff",controlspec.new(20,12000,'exp',0.01,12000,''))
-    params:set_action("post_filter_fc_"..i, function(x) softcut.post_filter_fc(i,x) end)
-    params:add_control("post_filter_lp_"..i,"lopass",controlspec.new(0,1,'lin',0.01,0,''))
-    params:set_action("post_filter_lp_"..i, function(x) softcut.post_filter_lp(i,x) end)
-    params:add_control("post_filter_hp_"..i,"hipass",controlspec.new(0,1,'lin',0.01,0,''))
-    params:set_action("post_filter_hp_"..i, function(x) softcut.post_filter_hp(i,x) end)
-    params:add_control("post_filter_bp_"..i,"bandpass",controlspec.new(0,1,'lin',0.01,0,''))
-    params:set_action("post_filter_bp_"..i, function(x) softcut.post_filter_bp(i,x) end)
-    params:add_control("post_filter_dry_"..i,"dry",controlspec.new(0,1,'lin',0.01,1,''))
-    params:set_action("post_filter_dry_"..i, function(x) softcut.post_filter_dry(i,x) end)
-    params:add_control("post_filter_rq_"..i,"resonance (0 = high)",controlspec.new(0.01,2,'lin',0.01,2,''))
-    params:set_action("post_filter_rq_"..i, function(x) softcut.post_filter_rq(i,x) end)
+    params:add_control("post_filter_fc_"..i,"filter cutoff ["..i.."]",controlspec.new(20,12000,'exp',0.01,12000,'hz'))
+    -- params:set_action("post_filter_fc_"..i, function(x) softcut.post_filter_fc(i,x) end)
+    params:set_action("post_filter_fc_"..i, function(x) set_softcut_param('post_filter_fc',i,x) end)
+    params:add_control("post_filter_lp_"..i,"lopass ["..i.."]",controlspec.new(0,1,'lin',0.01,0,''), function(param) return(util.round(param:get() * 100,1).."%") end)
+    -- params:set_action("post_filter_lp_"..i, function(x) softcut.post_filter_lp(i,x) end)
+    params:set_action("post_filter_lp_"..i, function(x) set_softcut_param('post_filter_lp',i,x) end)
+    params:add_control("post_filter_hp_"..i,"hipass ["..i.."]",controlspec.new(0,1,'lin',0.01,0,''), function(param) return(util.round(param:get() * 100,1).."%") end)
+    -- params:set_action("post_filter_hp_"..i, function(x) softcut.post_filter_hp(i,x) end)
+    params:set_action("post_filter_hp_"..i, function(x) set_softcut_param('post_filter_hp',i,x) end)
+    params:add_control("post_filter_bp_"..i,"bandpass ["..i.."]", controlspec.new(0,1,'lin',0.01,0,''), function(param) return(util.round(param:get() * 100,1).."%") end)
+    -- params:set_action("post_filter_bp_"..i, function(x) softcut.post_filter_bp(i,x) end)
+    params:set_action("post_filter_bp_"..i, function(x) set_softcut_param('post_filter_bp',i,x) end)
+    params:add_control("post_filter_dry_"..i,"dry ["..i.."]",controlspec.new(0,1,'lin',0.01,1,''), function(param) return(util.round(param:get() * 100,1).."%") end)
+    -- params:set_action("post_filter_dry_"..i, function(x) softcut.post_filter_dry(i,x) end)
+    params:set_action("post_filter_dry_"..i, function(x) set_softcut_param('post_filter_dry',i,x) end)
+    params:add_control("post_filter_rq_"..i,"resonance ["..i.."]", controlspec.new(0, 100, 'lin', 0.01, 0, nil, nil, nil), function(param) return(util.round(param:get(),1).."%") end)
+    -- params:set_action("post_filter_rq_"..i, function(x) local scaled = util.linlin(0,100,2.0,0.001,x) softcut.post_filter_rq(i,scaled) end)
+    params:set_action("post_filter_rq_"..i, function(x) local scaled = util.linlin(0,100,2.0,0.001,x) set_softcut_param('post_filter_rq',i,scaled) end)
+    _lfos:register("post_filter_fc_"..i, "filter cutoff", 'param action')
   end
-
-  _lfos.add_params("post_filter_fc_")
 
   chitter.init_params()
 
@@ -230,7 +247,8 @@ function _params.init()
   params:add_option("KEY3","KEY3", {"~~", "0.5", "-1", "1.5", "2"}, 1)
   params:set_action("KEY3", function(x) KEY3 = x end)
   params:add_number("voice_2_buffer","voice 2 buffer reference",1,2,2)
-  params:set_action("voice_2_buffer", function(x) softcut.buffer(2,x) end)
+  -- params:set_action("voice_2_buffer", function(x) softcut.buffer(2,x) end)
+  params:set_action("voice_2_buffer", function(x) set_softcut_param('buffer',2,x) end)
   params:add_separator("loop point quantization")
   for i = 1,4 do
     params:add_option("loop_quant_"..i,"voice ["..i.."]",{"seconds","beats"},1)
@@ -322,13 +340,19 @@ function _params.init()
       end
     end
     for i = 1,4 do
-      softcut.loop_start(i,track[i].start_point)
-      softcut.loop_end(i,track[i].end_point)
-      softcut.position(i,track[i].start_point)
+      -- softcut.loop_start(i,track[i].start_point)
+      set_softcut_param('loop_start',i,track[i].start_point)
+      -- softcut.loop_end(i,track[i].end_point)
+      set_softcut_param('loop_end',i,track[i].end_point)
+      -- softcut.position(i,track[i].start_point)
+      set_softcut_param('position',i,track[i].start_point)
       record(i,true)
     end
     loading_from_pset = false
   end
+  _lfos:add_params('levels', 'LFOs', true)
+  _lfos:add_params('panning', nil, true)
+  _lfos:add_params('filter cutoff')
 end
 
 return _params
