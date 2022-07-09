@@ -61,6 +61,7 @@ function queue.crawl_audio(_t)
   else
     clear[_t] = true
   end
+  print("clear: "..tostring(clear[_t]))
 end
 
 return queue

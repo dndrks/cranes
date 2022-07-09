@@ -42,6 +42,7 @@ pattern_time = require 'pattern_time'
 _pat = include 'lib/patterns'
 _loop = include 'lib/loop'
 _cue = include 'lib/queue'
+_transport = include 'lib/transport'
 
 -- engine.name="SimpleDelay"
 osc.event = osc_in
@@ -105,6 +106,7 @@ for i=1,4 do
   track[i].snapshot.mod_index = 0
   track[i].snapshot.focus = 1
   track[i].reverse = false
+  track[i].clear_count = -1
 end
 
 distance = {0,0}
@@ -251,6 +253,8 @@ function init()
   key2_hold_counter.time = 0.25
   key2_hold_counter.count = 1
   key2_hold_counter.event = function()
+    -- if not queue_menu.active then queue_menu.active = true end
+    prelim_key2_hold = true
     key2_hold = true
     screen_dirty = true
   end
@@ -275,10 +279,10 @@ function init()
 
   -- dev
   for i = 1,4 do
-    params:set("loop_sizing_voice_"..i, 2)
+    params:set("loop_sizing_voice_"..i, 1)
     params:set("rec_enable_voice_"..i, 2)
     params:set("rec_disable_voice_"..i, 2)
-    track[i].end_point = softcut_offsets[i]+8
+    -- track[i].end_point = softcut_offsets[i]+8
     track[i].queued.end_point = track[i].end_point
     set_softcut_param('enable',i,1)
   end
@@ -413,24 +417,31 @@ function key(n,z)
     if n == 2 then
       if not key1_hold then
         if z == 1 then
-          if queue_menu.active and not key2_hold then
-            key2_hold_counter:start()
-          end
-          if not queue_menu.active then
-            queue_menu.active = true
-            prelim_key2_hold = true
-          end
+          key2_hold = false
+          key2_hold_counter:start()
+          -- if queue_menu.active and not key2_hold then
+          --   key2_hold_counter:start()
+          -- end
+          -- if not queue_menu.active then
+          --   queue_menu.active = true
+          --   prelim_key2_hold = true
+          -- end
         else
-          if queue_menu.active then
-            key2_hold_counter:stop()
-            if prelim_key2_hold == false and key2_hold == false then
-              queue_menu.active = false
-            end
-            prelim_key2_hold = false
-            key2_hold = false
-          else
-            if key2_hold then key2_hold = false end
+          if not key2_hold then
+            queue_menu.active = not queue_menu.active
           end
+          key2_hold_counter:stop()
+          key2_hold = false
+          -- if queue_menu.active then
+          --   key2_hold_counter:stop()
+          --   if prelim_key2_hold == false and key2_hold == false then
+          --     queue_menu.active = false
+          --   end
+          --   prelim_key2_hold = false
+          --   key2_hold = false
+          -- else
+          --   if key2_hold then key2_hold = false end
+          -- end
         end
       elseif z == 1 then
         song_menu = true
@@ -440,10 +451,15 @@ function key(n,z)
     -- KEY 3
     -- all based on Parameter choice
     elseif n == 3 then
+      if not key2_hold and queue_menu.active and z == 1 then
+        -- rec_queued[_t] = true
+      end
       if key1_hold then
         _time.process_key(_t,n,z)
-      elseif key2_hold and queue_menu.active then
+      elseif key2_hold and queue_menu.active and z == 1 then
         _loop.jump_to_cue(_t)
+      elseif key2_hold and not queue_menu.active and z == 1 then
+        _loop.clear_track(_t)
       else
         if z == 1 then
           if _t == 1 or _t == 2 then
@@ -541,6 +557,8 @@ function redraw()
         screen.level(queue_menu.sel == 3 and 15 or 3)
         screen.text("(cue) e".._t..": "..util.round(track[_t].queued.end_point - softcut_offsets[_t],0.01).."s")
       else
+        screen.move(0,30)
+        screen.text(key2_hold and "K3: erase loop" or "")
         screen.move(0,40)
         screen.text("o".._t..": "..over[_t])
         screen.move(0,50)
@@ -643,7 +661,7 @@ function event(e)
     table.insert(quantize_events,e)
   else
     -- if e.section ~= PATTERN then event__rec.record(e) end
-    if e.section == "SNAP" then
+    if e.section == "SNAP" or e.section == "PITCHES" or e.section == "REVERSE" then
       _pat.record_grid_press(e)
     end
     event_exec(e)
@@ -661,7 +679,7 @@ function event_q_clock()
   if #quantize_events > 0 then
     for k,e in pairs(quantize_events) do
       -- if e.t ~= ePATTERN then event__rec.record(e) end
-      if e.section == "SNAP" then
+      if e.section == "SNAP" or e.section == "PITCHES" or e.section == "REVERSE" then
         _pat.record_grid_press(e)
       end
       event_exec(e)
@@ -689,20 +707,47 @@ function event_exec(e)
     else
       try_it(_t,e.x,snapshot_mod.index,"time")
     end
+  elseif e.section == "PITCHES" then
+    if not rec[_t] or (rec[_t] and not clear[_t]) then
+      if not track[_t].reverse then
+        params:set("speed_voice_".._t,e.x+5)
+      else
+        local reverse_key = {6,5,4,3,2,1}
+        params:set("speed_voice_".._t,reverse_key[e.x])
+      end
+    end
+  elseif e.section == "REVERSE" then
+    if not rec[_t] or (rec[_t] and not clear[_t]) then
+      track[_t].reverse = not track[_t].reverse
+      local reverse_current = {11,10,9,8,7,6,5,4,3,2,1}
+      params:set("speed_voice_".._t,reverse_current[params:get("speed_voice_".._t)])
+    end
   end
 end
 
 function play_voice(_t)
-  print(_t)
+  print("playing voice: ".._t)
+  -- set_softcut_param('level_slew_time',_t,0.3)
   track[_t].playing = true
   softcut.poll_start_phase()
-  set_softcut_param('level',_t,params:get("vol_".._t))
   set_softcut_param('loop_start',_t,track[_t].start_point)
   set_softcut_param('loop_end',_t,track[_t].end_point)
   set_softcut_param('position',_t,track[_t].start_point)
   set_softcut_param('rate_slew_time',_t,0.01)
   set_softcut_param('rate',_t, get_total_pitch_offset(_t)) -- TODO CONFIRM THIS IS OKAY
   set_softcut_param('play',_t,1)
+  set_softcut_param('level',_t,params:get("vol_".._t))
+  chitter_stretch[_t].pos = track[_t].start_point
+  screen_dirty = true
+  grid_dirty = true
+end
+
+function stop_voice(_t)
+  print("stopping voice: ".._t)
+  track[_t].playing = false
+  -- set_softcut_param('level_slew_time',_t,0.001)
+  set_softcut_param('level',_t,0)
+  set_softcut_param('position',_t,track[_t].start_point)
   chitter_stretch[_t].pos = track[_t].start_point
   screen_dirty = true
   grid_dirty = true
@@ -720,21 +765,12 @@ if y >= 5 and y <= 8 and x <= 8 and z == 1 then
   event(_e)
 elseif y >= 1 and y <= 4 and x <=6 and z == 1 then
   local _t = y
-  if not rec[_t] or (rec[_t] and not clear[_t]) then
-    if not track[_t].reverse then
-      params:set("speed_voice_".._t,x+5)
-    else
-      local reverse_key = {6,5,4,3,2,1}
-      params:set("speed_voice_".._t,reverse_key[x])
-    end
-  end
+  local _e = {section = "PITCHES", voice = _t, x = x, y = y, z = z}
+  event(_e)
 elseif y >= 1 and y <= 4 and x == 7 and z == 1 then
   local _t = y
-  if not rec[_t] or (rec[_t] and not clear[_t]) then
-    track[_t].reverse = not track[_t].reverse
-    local reverse_current = {11,10,9,8,7,6,5,4,3,2,1}
-    params:set("speed_voice_".._t,reverse_current[params:get("speed_voice_".._t)])
-  end
+  local _e = {section = "REVERSE", voice = _t, x = x, y = y, z = z}
+  event(_e)
 elseif y >= 1 and y <= 4 and x == 8 and z == 1 then
   local _t = y
   if grid_alt then

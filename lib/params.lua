@@ -169,10 +169,14 @@ function _params.init()
 
   chitter.init_params()
 
-  params:add_group("playback",5)
-  params:add_separator("transport controls playback")
+  params:add_group("playback",10)
+  params:add_separator("transport controls start")
   for i = 1,4 do
     params:add_option("transport_start_play_voice_"..i, "voice ["..i.."]",{"no","yes"},1)
+  end
+  params:add_separator("transport controls stop")
+  for i = 1,4 do
+    params:add_option("transport_stop_play_voice_"..i, "voice ["..i.."]",{"no","yes"},1)
   end
 
   params:add_group("recording",20)

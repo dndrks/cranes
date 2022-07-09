@@ -1,6 +1,7 @@
 local loop = {}
 
 function loop.queue_record(_t,silent)
+  print("rec: "..tostring(rec[_t]), "clear: "..tostring(clear[_t]))
   if not rec_queued[_t] then
     if not rec[_t] and clear[_t] then
       if params:string("rec_enable_voice_".._t) == "clock" then
@@ -20,25 +21,28 @@ function loop.queue_record(_t,silent)
         holding_crane[_t] = 0
       end
     elseif rec[_t] and clear[_t] then
-      -- if params:string("rec_disable_voice_".._t) == "clock" and params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
-      --   holding_crane[_t] = 1
-      --   screen_dirty = true
-      --   track[_t].rec_off_clock = clock.run(
-      --     function()
-      --       clock.sync(4)
-      --       print(clock.get_beats())
-      --       loop.execute_record(_t,silent)
-      --       holding_crane[_t] = 0
-      --     end
-      --   )
-      -- elseif params:string("rec_disable_voice_".._t) == "free" and params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
-      --   loop.execute_record(_t,silent)
-      -- else
-      --   print("unknown.")
-      -- end
-      if params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
+      if params:string("rec_disable_voice_".._t) == "clock" and params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
+        holding_crane[_t] = 1
+        screen_dirty = true
+        track[_t].rec_off_clock = clock.run(
+          function()
+            clock.sync(4)
+            print("holding here: "..clock.get_beats())
+            loop.execute_record(_t,silent)
+            holding_crane[_t] = 0
+          end
+        )
+      elseif params:string("rec_disable_voice_".._t) == "free" and params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
         loop.execute_record(_t,silent)
+      else
+        print("unknown.")
       end
+      -- if params:string("loop_sizing_voice_".._t) == "manual (w/K3)" then
+      --   print("not recording, executing")
+      --   loop.execute_record(_t,silent)
+      -- end
+    elseif not clear[_t] then
+      loop.execute_record(_t)
     end
 
   elseif rec_queued[_t] then
@@ -58,9 +62,11 @@ function loop.queue_record(_t,silent)
 end
 
 function loop.execute_record(_t,silent)
-  print(clock.get_beats())
+  print("executing rec: "..clock.get_beats())
+  local queued_executed = false;
   if not silent then
     rec[_t] = not rec[_t]
+    -- print("not silent")
   end
   -- check to see if the cue section is meant to be recorded into
   -- if so, enforce it
@@ -69,9 +75,10 @@ function loop.execute_record(_t,silent)
     track[_t].end_point = track[_t].queued.end_point
     set_softcut_param('loop_start',_t,track[_t].start_point)
     set_softcut_param('loop_end',_t,track[_t].end_point)
-    rec_queued[_t] = false
-    rec[_t] = true
     _cue.is_there_audio(_t)
+    rec_queued[_t] = false
+    queued_executed = true
+    rec[_t] = true
     print("is clear: "..(tostring(clear[_t])), track[_t].start_point, track[_t].end_point)
   end
   -- if the buffer is clear and recording is enabled:
@@ -125,6 +132,8 @@ function loop.execute_record(_t,silent)
     set_softcut_param('loop_end',_t,track[_t].end_point)
     -- softcut.loop_start(_t,track[_t].start_point)
     set_softcut_param('loop_start',_t,track[_t].start_point)
+    track[_t].queued.start_point = track[_t].start_point
+    track[_t].queued.end_point = track[_t].end_point
     -- track[2].start_point = 0
     recording_crane[_t] = 0
     screen_dirty = true
@@ -140,11 +149,13 @@ function loop.execute_record(_t,silent)
   end
   -- if the buffer is NOT clear and key 2 is pressed:
   -- overwrite/overdub behavior will enable
-  if rec[_t] and not clear[_t] then
+  if rec[_t] and not clear[_t] and not queued_executed then
+    print("would toggle overdub on", "| queued: "..tostring(rec_queued[_t]))
     loop.toggle_overdub(_t,"on")
   -- if the buffer is NOT clear and key 2 is pressed again:
   -- overwrite/overdub behavior will disable
-  elseif not rec[_t] and not clear[_t] then
+  elseif not rec[_t] and not clear[_t] and not queued_executed then
+    print("would toggle overdub off")
     loop.toggle_overdub(_t,"off")
   end
 
@@ -194,10 +205,11 @@ function loop.toggle_overdub(_t,state)
 end
 
 function loop.clear_track(_t)
+  track[_t].clear_count = track[_t].clear_count+1
   local scaled = {
     -- {buffer, start, end}
-    {1,softcut_offsets[1],global_duration},
-    {params:get("voice_2_buffer"),softcut_offsets[2],global_duration},
+    {1,softcut_offsets[1],softcut_offsets[1] + global_duration},
+    {params:get("voice_2_buffer"),softcut_offsets[2],softcut_offsets[2] + global_duration},
     {1,softcut_offsets[3],global_duration + softcut_offsets[3]},
     {2,softcut_offsets[4],global_duration + softcut_offsets[4]},
   }
@@ -253,6 +265,9 @@ function loop.clear_track(_t)
   KEY3_hold = false
   params:set("semitone_offset_".._t,0) -- TODO VERIFY IF NEEDED...
   track[_t].pos_grid = -1
+  if track[_t].clear_count == 2 then
+    track[_t].clear_count = 0
+  end
 end
 
 function loop.move_window(_t,direction)
