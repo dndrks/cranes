@@ -73,13 +73,21 @@ function loop.execute_record(_t,silent)
   if rec_queued[_t] then
     track[_t].start_point = track[_t].queued.start_point
     track[_t].end_point = track[_t].queued.end_point
-    set_softcut_param('loop_start',_t,track[_t].start_point)
-    set_softcut_param('loop_end',_t,track[_t].end_point)
-    _cue.is_there_audio(_t)
+    set_softcut_param('loop_start',_t,track[_t].queued.start_point)
+    set_softcut_param('loop_end',_t,track[_t].queued.end_point)
+    -- _cue.is_there_audio(_t)
+    clear[_t] = false
     rec_queued[_t] = false
-    queued_executed = true
+    queued_executed = false
     rec[_t] = true
     print("is clear: "..(tostring(clear[_t])), track[_t].start_point, track[_t].end_point)
+    track[_t].overdub_off_clock = clock.run(
+        function()
+          clock.sleep(track[_t].end_point - track[_t].start_point)
+          print("yep, overdub clock")
+          loop.execute_record(_t)
+        end
+      )
   end
   -- if the buffer is clear and recording is enabled:
   -- main recording will enable

@@ -38,11 +38,11 @@ _flow = include 'lib/flow'
 _song = include 'lib/song'
 _time = include 'lib/time'
 _ea = include 'lib/enc_actions'
-pattern_time = require 'pattern_time'
 _pat = include 'lib/patterns'
 _loop = include 'lib/loop'
 _cue = include 'lib/queue'
 _transport = include 'lib/transport'
+_pt = include 'lib/cranes_pt'
 
 -- engine.name="SimpleDelay"
 osc.event = osc_in
@@ -452,7 +452,7 @@ function key(n,z)
     -- all based on Parameter choice
     elseif n == 3 then
       if not key2_hold and queue_menu.active and z == 1 then
-        -- rec_queued[_t] = true
+        rec_queued[_t] = true
       end
       if key1_hold then
         _time.process_key(_t,n,z)
@@ -656,12 +656,16 @@ end
 
 -- GRID --
 
-function event(e)
+function rec_playback_event(e)
+  grid_event(e,true)
+end
+
+function grid_event(e,silent)
   if quantize == 1 then
+    e.silent = silent
     table.insert(quantize_events,e)
   else
-    -- if e.section ~= PATTERN then event__rec.record(e) end
-    if e.section == "SNAP" or e.section == "PITCHES" or e.section == "REVERSE" then
+    if not silent then
       _pat.record_grid_press(e)
     end
     event_exec(e)
@@ -678,8 +682,7 @@ end
 function event_q_clock()
   if #quantize_events > 0 then
     for k,e in pairs(quantize_events) do
-      -- if e.t ~= ePATTERN then event__rec.record(e) end
-      if e.section == "SNAP" or e.section == "PITCHES" or e.section == "REVERSE" then
+      if not e.silent then
         _pat.record_grid_press(e)
       end
       event_exec(e)
@@ -702,10 +705,15 @@ function event_exec(e)
       end
     end
   elseif e.section == "SNAP" then
-    if snapshot_mod.index == 0 then
+    -- if snapshot_mod.index == 0 then
+    --   snapshot.unpack(_t,e.x)
+    -- else
+    --   try_it(_t,e.x,snapshot_mod.index,"time")
+    -- end
+    if e.mod_index == 0 then
       snapshot.unpack(_t,e.x)
     else
-      try_it(_t,e.x,snapshot_mod.index,"time")
+      try_it(_t,e.x,e.mod_index,"time")
     end
   elseif e.section == "PITCHES" then
     if not rec[_t] or (rec[_t] and not clear[_t]) then
@@ -759,18 +767,17 @@ g = grid.connect()
 g.key = function(x,y,z)
 
 if y >= 5 and y <= 8 and x <= 8 and z == 1 then
-  -- local e={t=ePATTERN,i=i,action="rec_stop"} event(e)
   local _t = y-4
   local _e = {section = "CUT", voice = _t, x = x, y = y, z = z}
-  event(_e)
+  grid_event(_e)
 elseif y >= 1 and y <= 4 and x <=6 and z == 1 then
   local _t = y
   local _e = {section = "PITCHES", voice = _t, x = x, y = y, z = z}
-  event(_e)
+  grid_event(_e)
 elseif y >= 1 and y <= 4 and x == 7 and z == 1 then
   local _t = y
   local _e = {section = "REVERSE", voice = _t, x = x, y = y, z = z}
-  event(_e)
+  grid_event(_e)
 elseif y >= 1 and y <= 4 and x == 8 and z == 1 then
   local _t = y
   if grid_alt then
@@ -795,9 +802,9 @@ elseif y >= 1 and y <= 4 and x >= 11 then
         if grid_alt then
           track[_t].snapshot.saver_clock = clock.run(snapshot.save_to_slot,_t,x)
         else
-          local _e = {section = "SNAP", voice = _t, x = x}
+          local _e = {section = "SNAP", voice = _t, x = x, mod_index = snapshot_mod.index}
           -- tab.print(_e)
-          event(_e)
+          grid_event(_e)
           -- if snapshot_mod.index == 0 then
           --   snapshot.unpack(_t,x)
           -- else
@@ -823,13 +830,19 @@ elseif y == 5 and x >= 11 and x <= 16 then
     snapshot_mod.held[x-10] = true
     snapshot_mod.index = x-10
   end
-elseif y == 8 and x >= 13 and x <= 16 and z == 1 then
-  local _t = x-12
-  voice_on_screen = _t
-  page.flow.voice = _t
-  screen_dirty = true
+elseif y == 8 and x == 13 then
+  overdub_toggle = z == 1 and true or false
+elseif y == 8 and x == 14 then
+  loop_toggle = z == 1 and true or false
+elseif y == 8 and x == 15 then
+  duplicate_toggle = z == 1 and true or false
+elseif y == 8 and x == 16 then
+  copy_toggle = z == 1 and true or false
 elseif y == 8 and x == 9 then
   grid_alt = z == 1 and true or false
+elseif (y == 6 or y == 7) and x >= 13 and z == 1 then
+  local target = (x-12)+(4*(y-6))
+  _pat.handle_grid_pat(target,grid_alt)
 end
 
   grid_dirty = true
@@ -878,9 +891,36 @@ function grid_redraw()
     g:led(8,i,rec[_t] and 15 or (not clear[_t] and 8 or 3) or 3)
   end
 
-  for i = 1,4 do
-    g:led(i+12,8,voice_on_screen == i and 12 or 3)
+  for i = 1,8 do
+    local led_level
+    if pattern[i].count == 0 and pattern[i].rec == 0 then
+      led_level = 3
+    elseif pattern[i].rec == 1 then
+      led_level = 10
+    elseif pattern[i].play == 1 and pattern[i].overdub == 0 then
+      led_level = 15
+    else
+      if pattern[i].overdub == 1 then
+        -- led_level = 15 - (util.round(clock.get_beats() % 4)*3)
+        led_level = 15 - util.round((util.round(clock.get_beats() % 4,0.5) * 3))
+      else
+        led_level = 8
+      end
+    end
+    if loop_toggle then
+      led_level = pattern[i].loop == 1 and 12 or 3
+    end
+    g:led(_flow.index_to_grid_pos(i,4)[1]+12,_flow.index_to_grid_pos(i,4)[2]+5,led_level)
   end
+
+  -- for i = 1,4 do
+    -- g:led(i+12,8,voice_on_screen == i and 12 or 3)
+  -- end
+
+  g:led(13,8,overdub_toggle and 15 or 6)
+  g:led(14,8,loop_toggle and 15 or 6)
+  g:led(15,8,duplicate_toggle and 15 or 6)
+  g:led(16,8,copy_toggle and 15 or 6)
 
   g:led(9,8,grid_alt and 15 or 5)
 

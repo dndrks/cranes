@@ -179,7 +179,7 @@ function _params.init()
     params:add_option("transport_stop_play_voice_"..i, "voice ["..i.."]",{"no","yes"},1)
   end
 
-  params:add_group("recording",20)
+  params:add_group("recording",24)
   params:add_separator("record enable trigger")
   for i = 1,4 do
     params:add_option("rec_enable_voice_"..i, "voice ["..i.."]",{"free","clock","threshold"})
@@ -213,15 +213,17 @@ function _params.init()
       end
     end)
   end
-  params:add_separator("rec cue window quantization")
+  params:add_separator("rec cue window")
   for i = 1,4 do
-    params:add_option("queue_window_quant_voice_"..i, "voice ["..i.."]",{"free","fixed"},2)
+    params:add_option("queue_window_quant_voice_"..i, "quantization: voice ["..i.."]",{"free","fixed"},2)
+    params:add_control("queue_window_offset_voice_"..i, "offset: voice ["..i.."]",controlspec.new(0, 1, 'lin', 0.01, 0.10, nil, nil, nil), function(param) return(util.round(param:get(),0.01).."s") end)
   end
 
-  params:add_group("patterns", 13)
+  params:add_group("patterns", 25)
   params:add_separator("recording start/stop")
-  for i = 1,4 do
-    params:add_option("pattern_rec_mode_"..i, "voice ["..i.."]", {'free','duration','clocked'}, 1)
+  local number_to_letter = {'a','b','c','d','e','f','g','h'}
+  for i = 1,8 do
+    params:add_option("pattern_rec_mode_"..i, "rec mode "..number_to_letter[i], {'free','duration','clocked'}, 1)
     params:add_option("pattern_rec_start_"..i, "   start at", {"next beat","next bar"}, 1)
     params:add_number("pattern_rec_duration_"..i, "   duration", 1, 128, 1, function(param) return (param:get().." beats") end)
     params:set_action("pattern_rec_mode_"..i,

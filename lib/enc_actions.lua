@@ -107,14 +107,14 @@ function enc_actions.delta_window(_t,d,queue)
       if d > 0 then
         if util.round(track[_t].queued.end_point + (math.abs(track[_t].queued.end_point - track[_t].queued.start_point)),0.0000001) <= global_duration + softcut_offsets[_t] then
           local original_start = track[_t].queued.start_point
-          track[_t].queued.start_point = track[_t].queued.end_point
-          track[_t].queued.end_point = track[_t].queued.end_point + (math.abs(track[_t].queued.end_point - original_start))
+          track[_t].queued.start_point = track[_t].queued.end_point + (params:get("queue_window_offset_voice_".._t))
+          track[_t].queued.end_point = track[_t].queued.end_point + (math.abs(track[_t].queued.end_point - original_start)) + (params:get("queue_window_offset_voice_".._t))
         end
       elseif d < 0 then
         if util.round(track[_t].queued.start_point - (math.abs(track[_t].queued.end_point - track[_t].queued.start_point)),0.0000001) >= softcut_offsets[_t] then
           local original_end = track[_t].queued.end_point
-          track[_t].queued.end_point = track[_t].queued.start_point
-          track[_t].queued.start_point = track[_t].queued.start_point - (math.abs(original_end - track[_t].queued.start_point))
+          track[_t].queued.end_point = track[_t].queued.start_point - (params:get("queue_window_offset_voice_".._t))
+          track[_t].queued.start_point = track[_t].queued.start_point - (math.abs(original_end - track[_t].queued.start_point)) - (params:get("queue_window_offset_voice_".._t))
         end
       end
     end
