@@ -56,7 +56,7 @@ function ca.load_sample(file,sample,summed)
     set_softcut_param('buffer read file',{file, 0, scaled[sample][2], clip[sample].sample_length + 0.05, im_ch, scaled[sample][1]})
     -- //
 
-    track[sample].end_point = (clip[sample].sample_length-0.01) + softcut_offsets[sample]
+    track[sample].end_point = (clip[sample].sample_length-FADE_TIME) + softcut_offsets[sample]
     track[sample].queued.end_point = track[sample].end_point
     set_softcut_param('rec_level',sample,0)
     if params:string("transport_start_play_voice_"..sample) == "no" then

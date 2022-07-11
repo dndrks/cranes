@@ -27,7 +27,7 @@ function chitter.init_params()
           clock.cancel(chitter_stretch[i].clock)
           chitter_stretch[i].enabled = false
           chitter_stretch[i].clock = nil
-          set_softcut_param('fade_time',i,0.01)
+          set_softcut_param('fade_time',i,FADE_TIME)
           track[i].chitter_stretch = false
         end
         params:hide("chittering_step_"..i)
@@ -169,11 +169,11 @@ function chitter.toggle(i) -- this shouldn't call/cancel clock, it should gate i
   if chitter_stretch[i].clock ~= nil then
     clock.cancel(chitter_stretch[i].clock)
     chitter_stretch[i].enabled = false
-    for j = 1,16 do
+    for j = 1,4 do
       track[i].chitter_stretch = false
     end
     chitter_stretch[i].clock = nil
-    set_softcut_param('fade_time',i,0.01)
+    set_softcut_param('fade_time',i,FADE_TIME)
   else
     set_softcut_param('fade_time',i,chitter_stretch[i].fade_time/100)
     chitter_stretch[i].pos = bank[i][bank[i].id].start_point
@@ -232,11 +232,11 @@ end
 function chitter.cheat(i)
   local pad = bank[i][bank[i].id]
   if not chitter_stretch[i].enabled then
-    set_softcut_param('fade_time',i,0.01)
+    set_softcut_param('fade_time',i,FADE_TIME)
     if pad.rate > 0 then
-      set_softcut_param('position',i,pad.start_point+0.01)
+      set_softcut_param('position',i,pad.start_point+FADE_TIME)
     elseif pad.rate < 0 then
-      set_softcut_param('position',i,pad.end_point-0.01-0.01)
+      set_softcut_param('position',i,pad.end_point-FADE_TIME-FADE_TIME)
     end
   else
     if pad.rate > 0 then

@@ -179,7 +179,7 @@ function _params.init()
     params:add_option("transport_stop_play_voice_"..i, "voice ["..i.."]",{"no","yes"},1)
   end
 
-  params:add_group("recording",24)
+  params:add_group("recording",15)
   params:add_separator("record enable trigger")
   for i = 1,4 do
     params:add_option("rec_enable_voice_"..i, "voice ["..i.."]",{"free","clock","threshold"})
@@ -213,9 +213,15 @@ function _params.init()
       end
     end)
   end
-  params:add_separator("rec cue window")
+
+  params:add_group("queueing",14)
+  params:add_separator("rec queue jump quantization")
   for i = 1,4 do
-    params:add_option("queue_window_quant_voice_"..i, "quantization: voice ["..i.."]",{"free","fixed"},2)
+    params:add_option("queue_quant_voice_"..i, "voice ["..i.."]",{"free","clock","threshold"})
+  end
+  params:add_separator("rec queueing")
+  for i = 1,4 do
+    params:add_option("queue_window_quant_voice_"..i, "sizing: voice ["..i.."]",{"free","fixed"},2)
     params:add_control("queue_window_offset_voice_"..i, "offset: voice ["..i.."]",controlspec.new(0, 1, 'lin', 0.01, 0.10, nil, nil, nil), function(param) return(util.round(param:get(),0.01).."s") end)
   end
 
@@ -347,9 +353,9 @@ function _params.init()
     end
     for i = 1,4 do
       -- softcut.loop_start(i,track[i].start_point)
-      set_softcut_param('loop_start',i,track[i].start_point)
+      set_softcut_param('loop_start',i,track[i].start_point - FADE_TIME)
       -- softcut.loop_end(i,track[i].end_point)
-      set_softcut_param('loop_end',i,track[i].end_point)
+      set_softcut_param('loop_end',i,track[i].end_point - FADE_TIME)
       -- softcut.position(i,track[i].start_point)
       set_softcut_param('position',i,track[i].start_point)
       record(i,true)

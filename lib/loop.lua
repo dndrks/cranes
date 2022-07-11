@@ -106,7 +106,7 @@ function loop.execute_record(_t,silent)
     --   softcut.loop_end(_t,track[_t].end_point)
     --   rec_queued[_t] = false
     -- end
-    set_softcut_param('position',_t,track[_t].start_point)
+    set_softcut_param('position',_t,track[_t].start_point - FADE_TIME)
     set_softcut_param('rate_slew_time',_t,0)
     set_softcut_param('rate',_t,1) -- TODO CONFIRM THIS IS OKAY
     set_softcut_param('play',_t,1)
@@ -123,7 +123,7 @@ function loop.execute_record(_t,silent)
     -- clear[_t] = false
     _cue.is_there_audio(_t)
     -- softcut.position(_t,track[_t].start_point)
-    set_softcut_param('position',_t,track[_t].start_point)
+    set_softcut_param('position',_t,track[_t].start_point - FADE_TIME)
     -- softcut.rec_level(_t,0)
     set_softcut_param('rec_level',_t,0)
     counter[_t]:stop()
@@ -133,13 +133,20 @@ function loop.execute_record(_t,silent)
     if params:string("loop_sizing_voice_".._t) == "dialed (w/encoders)" then
       -- track[_t].end_point = (softcut_offsets[_t] + rec_time[_t])
     else
-      track[_t].end_point = (softcut_offsets[_t] + rec_time[_t])
+      if params:string("rec_disable_voice_".._t) == "clock" then
+        local rounded_beat_dur = util.round(rec_time[_t]/clock.get_beat_sec())
+        local rounded_time_dur = clock.get_beat_sec()*rounded_beat_dur
+        track[_t].end_point = (softcut_offsets[_t] + rounded_time_dur)
+        print(rounded_beat_dur,rounded_time_dur)
+      else
+        track[_t].end_point = (softcut_offsets[_t] + rec_time[_t])
+      end
     end
     print(_t,track[_t].end_point, rec_time[_t])
     -- softcut.loop_end(_t,track[_t].end_point)
-    set_softcut_param('loop_end',_t,track[_t].end_point)
+    set_softcut_param('loop_end',_t,track[_t].end_point - FADE_TIME)
     -- softcut.loop_start(_t,track[_t].start_point)
-    set_softcut_param('loop_start',_t,track[_t].start_point)
+    set_softcut_param('loop_start',_t,track[_t].start_point - FADE_TIME)
     track[_t].queued.start_point = track[_t].start_point
     track[_t].queued.end_point = track[_t].end_point
     -- track[2].start_point = 0
@@ -182,10 +189,20 @@ function loop.execute_record(_t,silent)
 end
 
 function loop.jump_to_cue(_t)
-  track[_t].start_point = track[_t].queued.start_point
-  track[_t].end_point = track[_t].queued.end_point
-  set_softcut_param('loop_start',_t,track[_t].start_point)
-  set_softcut_param('loop_end',_t,track[_t].end_point)
+  if track[_t].queue_jump_clock then
+    clock.cancel(track[_t].queue_jump_clock)
+  end
+  track[_t].queue_jump_clock = clock.run(
+    function()
+      if params:string("queue_quant_voice_".._t) == 'clock' then
+        clock.sync(4)
+      end
+      track[_t].start_point = track[_t].queued.start_point
+      track[_t].end_point = track[_t].queued.end_point
+      set_softcut_param('loop_start',_t,track[_t].start_point)
+      set_softcut_param('loop_end',_t,track[_t].end_point)
+    end
+  )
 end
 
 function loop.toggle_overdub(_t,state)
@@ -235,7 +252,6 @@ function loop.clear_track(_t)
   set_softcut_param('play',_t,1)
   track[_t].playing = false
   -- softcut.position(_t, scaled[_t][2])
-  set_softcut_param('position',_t,scaled[_t][2])
   -- softcut.rate(_t, 1) -- TODO CONFIRM THIS IS OK
   set_softcut_param('rate',_t,1)
   -- softcut.loop_start(_t, scaled[_t][2])

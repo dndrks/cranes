@@ -51,6 +51,7 @@ DATA_DIR = _path.data.."cranes/"
 AUDIO_DIR = _path.audio.."cranes/"
 TRACKS = 2
 grid_alt = false
+FADE_TIME = 0.015
 
 function r()
   norns.script.load(norns.state.script)
@@ -84,6 +85,7 @@ end
 snapshot_count = {0,0,0,0}
 selected_snapshot = {0,0,0,0}
 snapshot_mod = {["index"] = 0, ["held"] = {false,false,false,false,false,false}}
+snapshot_page = 1
 
 softcut_offsets = {1,1,101,201}
 global_duration = 60
@@ -218,8 +220,8 @@ function init()
     set_softcut_param('loop_start',i,softcut_offsets[i])
     set_softcut_param('loop_end',i,global_duration+softcut_offsets[i])
     set_softcut_param('loop',i,1)
-    set_softcut_param('fade_time',i,0.015)
-    set_softcut_param('recpre_slew_time',i,0.015)
+    set_softcut_param('fade_time',i,FADE_TIME)
+    set_softcut_param('recpre_slew_time',i,FADE_TIME)
     set_softcut_param('rec',i,1) -- TODO CONFIRM GOOD
     set_softcut_param('rec_level',i,0)
     set_softcut_param('pre_level',i,1)
@@ -740,7 +742,7 @@ function play_voice(_t)
   softcut.poll_start_phase()
   set_softcut_param('loop_start',_t,track[_t].start_point)
   set_softcut_param('loop_end',_t,track[_t].end_point)
-  set_softcut_param('position',_t,track[_t].start_point)
+  set_softcut_param('position',_t,track[_t].start_point - FADE_TIME)
   set_softcut_param('rate_slew_time',_t,0.01)
   set_softcut_param('rate',_t, get_total_pitch_offset(_t)) -- TODO CONFIRM THIS IS OKAY
   set_softcut_param('play',_t,1)
@@ -755,7 +757,7 @@ function stop_voice(_t)
   track[_t].playing = false
   -- set_softcut_param('level_slew_time',_t,0.001)
   set_softcut_param('level',_t,0)
-  set_softcut_param('position',_t,track[_t].start_point)
+  set_softcut_param('position',_t,track[_t].start_point - FADE_TIME)
   chitter_stretch[_t].pos = track[_t].start_point
   screen_dirty = true
   grid_dirty = true
@@ -766,86 +768,91 @@ g = grid.connect()
 -- hardware: grid event (eg 'what happens when a button is pressed')
 g.key = function(x,y,z)
 
-if y >= 5 and y <= 8 and x <= 8 and z == 1 then
-  local _t = y-4
-  local _e = {section = "CUT", voice = _t, x = x, y = y, z = z}
-  grid_event(_e)
-elseif y >= 1 and y <= 4 and x <=6 and z == 1 then
-  local _t = y
-  local _e = {section = "PITCHES", voice = _t, x = x, y = y, z = z}
-  grid_event(_e)
-elseif y >= 1 and y <= 4 and x == 7 and z == 1 then
-  local _t = y
-  local _e = {section = "REVERSE", voice = _t, x = x, y = y, z = z}
-  grid_event(_e)
-elseif y >= 1 and y <= 4 and x == 8 and z == 1 then
-  local _t = y
-  if grid_alt then
-    _loop.clear_track(_t)
-  else
-    _loop.queue_record(_t)
-  end
-elseif y >= 1 and y <= 4 and x >= 11 then
-  local _t = y
-  if z == 1 then
-    if x >= 11 then
-      x = x-10
-      if tab.count(snapshots[_t][x]) < 2 then
-        track[_t].snapshot.saver_clock = clock.run(snapshot.save_to_slot,_t,x)
-        track[_t].snapshot.focus = x
-      else
-        -- local modifier, style = 0,"beats"
-        -- if track[_t].restore_mod then
-        --   modifier =  track[_t].snapshot[i].restore_times[track[_t].snapshot[i].restore_times.mode][track[_t].restore_mod_index]
-        --   style = track[_t].snapshot[i].restore_times.mode
-        -- end
-        if grid_alt then
+  if y >= 5 and y <= 8 and x <= 8 and z == 1 then
+    local _t = y-4
+    local _e = {section = "CUT", voice = _t, x = x, y = y, z = z}
+    grid_event(_e)
+  elseif y >= 1 and y <= 4 and x <=6 and z == 1 then
+    local _t = y
+    local _e = {section = "PITCHES", voice = _t, x = x, y = y, z = z}
+    grid_event(_e)
+  elseif y >= 1 and y <= 4 and x == 7 and z == 1 then
+    local _t = y
+    local _e = {section = "REVERSE", voice = _t, x = x, y = y, z = z}
+    grid_event(_e)
+  elseif y >= 1 and y <= 4 and x == 8 and z == 1 then
+    local _t = y
+    if grid_alt then
+      _loop.clear_track(_t)
+    else
+      _loop.queue_record(_t)
+    end
+  elseif y >= 1 and y <= 4 and x >= 11 then
+    local _t = y
+    if z == 1 then
+      if x >= 11 then
+        x = (x-10) + (6*(snapshot_page-1))
+        if tab.count(snapshots[_t][x]) < 2 then
           track[_t].snapshot.saver_clock = clock.run(snapshot.save_to_slot,_t,x)
+          track[_t].snapshot.focus = x
         else
-          local _e = {section = "SNAP", voice = _t, x = x, mod_index = snapshot_mod.index}
-          -- tab.print(_e)
-          grid_event(_e)
-          -- if snapshot_mod.index == 0 then
-          --   snapshot.unpack(_t,x)
-          -- else
-          --   try_it(_t,x,snapshot_mod.index,"time")
+          -- local modifier, style = 0,"beats"
+          -- if track[_t].restore_mod then
+          --   modifier =  track[_t].snapshot[i].restore_times[track[_t].snapshot[i].restore_times.mode][track[_t].restore_mod_index]
+          --   style = track[_t].snapshot[i].restore_times.mode
           -- end
+          if grid_alt then
+            track[_t].snapshot.saver_clock = clock.run(snapshot.save_to_slot,_t,x)
+          else
+            local _e = {section = "SNAP", voice = _t, x = x, mod_index = snapshot_mod.index}
+            -- tab.print(_e)
+            grid_event(_e)
+            -- if snapshot_mod.index == 0 then
+            --   snapshot.unpack(_t,x)
+            -- else
+            --   try_it(_t,x,snapshot_mod.index,"time")
+            -- end
+          end
+          track[_t].snapshot.focus = x
         end
-        track[_t].snapshot.focus = x
+      end
+    else
+      if track[_t].snapshot.saver_clock ~= nil then
+        clock.cancel(track[_t].snapshot.saver_clock)
       end
     end
-  else
-    if track[_t].snapshot.saver_clock ~= nil then
-      clock.cancel(track[_t].snapshot.saver_clock)
-    end
-  end
-elseif y == 5 and x >= 11 and x <= 16 then
-  if z == 0 then
-    snapshot_mod.held[x-10] = false
-    if tab.contains(snapshot_mod.held,true) then
+  elseif y == 5 and x >= 11 and x <= 16 then
+    if z == 0 then
+      snapshot_mod.held[x-10] = false
+      if tab.contains(snapshot_mod.held,true) then
+      else
+        snapshot_mod.index = 0
+      end
     else
-      snapshot_mod.index = 0
+      snapshot_mod.held[x-10] = true
+      snapshot_mod.index = x-10
     end
-  else
-    snapshot_mod.held[x-10] = true
-    snapshot_mod.index = x-10
+  elseif x == 10 and y == 5 and z == 1 then
+    snapshot_page = util.wrap(snapshot_page+1,1,2)
+  elseif y == 8 and x == 13 then
+    overdub_toggle = z == 1 and true or false
+  elseif y == 8 and x == 14 then
+    loop_toggle = z == 1 and true or false
+  elseif y == 8 and x == 15 then
+    duplicate_toggle = z == 1 and true or false
+  elseif y == 8 and x == 16 then
+    copy_toggle = z == 1 and true or false
+  elseif y == 8 and x == 9 then
+    grid_alt = z == 1 and true or false
+  elseif (y == 6 or y == 7) and x >= 13 and z == 1 then
+    local target = (x-12)+(4*(y-6))
+    _pat.handle_grid_pat(target,grid_alt)
+  elseif x == 9 and y <=4 then
+    voice_on_screen = y
   end
-elseif y == 8 and x == 13 then
-  overdub_toggle = z == 1 and true or false
-elseif y == 8 and x == 14 then
-  loop_toggle = z == 1 and true or false
-elseif y == 8 and x == 15 then
-  duplicate_toggle = z == 1 and true or false
-elseif y == 8 and x == 16 then
-  copy_toggle = z == 1 and true or false
-elseif y == 8 and x == 9 then
-  grid_alt = z == 1 and true or false
-elseif (y == 6 or y == 7) and x >= 13 and z == 1 then
-  local target = (x-12)+(4*(y-6))
-  _pat.handle_grid_pat(target,grid_alt)
-end
 
   grid_dirty = true
+  screen_dirty = true
 end
 
 -- hardware: grid redraw
@@ -855,9 +862,12 @@ function grid_redraw()
   for i = 11,16 do
     for j = 1,4 do
       local _t = j
-      g:led(i,j,tab.count(snapshots[_t][i-10]) > 1 and 6 or 3)
-      if selected_snapshot[_t] ~= 0 then
-        g:led(selected_snapshot[_t]+10,j,12)
+      local snap_sel = (i - 10) + (6*(snapshot_page-1))
+      g:led(i,j,tab.count(snapshots[_t][snap_sel]) > 1 and 6 or 3)
+      -- if selected_snapshot[_t] ~= 0 then
+      if selected_snapshot[_t] <= 6 + (6*(snapshot_page-1)) and selected_snapshot[_t] >= 1 + (6*(snapshot_page-1)) then
+        snap_sel = selected_snapshot[_t] - (6*(snapshot_page-1))
+        g:led(snap_sel+10,j,12)
       end
     end
   end
@@ -916,6 +926,16 @@ function grid_redraw()
   -- for i = 1,4 do
     -- g:led(i+12,8,voice_on_screen == i and 12 or 3)
   -- end
+
+  for i = 1,4 do
+    g:led(9,i,voice_on_screen == i and 8 or 0)
+  end
+
+  g:led(10,5,snapshot_page == 1 and 3 or 8)
+
+  for i = 1,6 do
+    g:led(i+10,5,snapshot_mod.index == i and 15 or 6)
+  end
 
   g:led(13,8,overdub_toggle and 15 or 6)
   g:led(14,8,loop_toggle and 15 or 6)
