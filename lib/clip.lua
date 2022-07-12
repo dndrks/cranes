@@ -51,7 +51,6 @@ function ca.load_sample(file,sample,summed)
       {2,softcut_offsets[4],clip[sample].sample_length + 0.05 + softcut_offsets[4]},
     }
 
-    -- TODO GENERALIZE:
     set_softcut_param('buffer clear',{scaled[sample][1],scaled[sample][2],global_duration})
     set_softcut_param('buffer read file',{file, 0, scaled[sample][2], clip[sample].sample_length + 0.05, im_ch, scaled[sample][1]})
     -- //

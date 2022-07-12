@@ -699,7 +699,7 @@ function event_exec(e)
   if e.section == "CUT" then
     if not rec[_t] or (rec[_t] and not clear[_t]) then
       local _block = (track[_t].end_point - track[_t].start_point) / 8
-      local _cutposition = _block * (e.x-1) + softcut_offsets[_t]
+      local _cutposition = _block * (e.x-1) + softcut_offsets[_t] - FADE_TIME
       if params:string("chittering_mode_".._t) ~= "off" then
         chitter_stretch[_t].pos = _cutposition
       else
@@ -740,14 +740,14 @@ function play_voice(_t)
   -- set_softcut_param('level_slew_time',_t,0.3)
   track[_t].playing = true
   softcut.poll_start_phase()
-  set_softcut_param('loop_start',_t,track[_t].start_point)
-  set_softcut_param('loop_end',_t,track[_t].end_point)
+  set_softcut_param('loop_start',_t,track[_t].start_point - FADE_TIME)
+  set_softcut_param('loop_end',_t,track[_t].end_point - FADE_TIME)
   set_softcut_param('position',_t,track[_t].start_point - FADE_TIME)
   set_softcut_param('rate_slew_time',_t,0.01)
   set_softcut_param('rate',_t, get_total_pitch_offset(_t)) -- TODO CONFIRM THIS IS OKAY
   set_softcut_param('play',_t,1)
   set_softcut_param('level',_t,params:get("vol_".._t))
-  chitter_stretch[_t].pos = track[_t].start_point
+  chitter_stretch[_t].pos = track[_t].start_point - FADE_TIME
   screen_dirty = true
   grid_dirty = true
 end
@@ -758,7 +758,7 @@ function stop_voice(_t)
   -- set_softcut_param('level_slew_time',_t,0.001)
   set_softcut_param('level',_t,0)
   set_softcut_param('position',_t,track[_t].start_point - FADE_TIME)
-  chitter_stretch[_t].pos = track[_t].start_point
+  chitter_stretch[_t].pos = track[_t].start_point - FADE_TIME
   screen_dirty = true
   grid_dirty = true
 end
@@ -785,6 +785,9 @@ g.key = function(x,y,z)
     if grid_alt then
       _loop.clear_track(_t)
     else
+      if queue_menu.active then
+        rec_queued[_t] = true
+      end
       _loop.queue_record(_t)
     end
   elseif y >= 1 and y <= 4 and x >= 11 then

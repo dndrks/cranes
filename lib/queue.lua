@@ -18,7 +18,7 @@ end
 
 function queue.on_render(ch, start, i, s)
   local _t;
-  if start < 100 then
+  if start < 101 then
     if ch <= 2 then
       _t = ch
     end

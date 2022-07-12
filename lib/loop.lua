@@ -9,9 +9,11 @@ function loop.queue_record(_t,silent)
         screen_dirty = true
         track[_t].rec_on_clock = clock.run(
           function()
-            -- print("queued record on ".._t, silent)
-            -- clock.sync(4,-1/128)
-            clock.sync(4)
+            if clock.get_beats() < 1 then
+              clock.sync(4)
+            else
+              clock.sync(4,-1/100)
+            end
             loop.execute_record(_t,silent)
             holding_crane[_t] = 0
           end
@@ -73,8 +75,9 @@ function loop.execute_record(_t,silent)
   if rec_queued[_t] then
     track[_t].start_point = track[_t].queued.start_point
     track[_t].end_point = track[_t].queued.end_point
-    set_softcut_param('loop_start',_t,track[_t].queued.start_point)
-    set_softcut_param('loop_end',_t,track[_t].queued.end_point)
+    set_softcut_param('loop_start',_t,track[_t].queued.start_point - FADE_TIME)
+    set_softcut_param('loop_end',_t,track[_t].queued.end_point - FADE_TIME)
+    set_softcut_param('position',_t,track[_t].queued.start_point - FADE_TIME)
     -- _cue.is_there_audio(_t)
     clear[_t] = false
     rec_queued[_t] = false
@@ -137,15 +140,12 @@ function loop.execute_record(_t,silent)
         local rounded_beat_dur = util.round(rec_time[_t]/clock.get_beat_sec())
         local rounded_time_dur = clock.get_beat_sec()*rounded_beat_dur
         track[_t].end_point = (softcut_offsets[_t] + rounded_time_dur)
-        print(rounded_beat_dur,rounded_time_dur)
       else
         track[_t].end_point = (softcut_offsets[_t] + rec_time[_t])
       end
     end
     print(_t,track[_t].end_point, rec_time[_t])
-    -- softcut.loop_end(_t,track[_t].end_point)
     set_softcut_param('loop_end',_t,track[_t].end_point - FADE_TIME)
-    -- softcut.loop_start(_t,track[_t].start_point)
     set_softcut_param('loop_start',_t,track[_t].start_point - FADE_TIME)
     track[_t].queued.start_point = track[_t].start_point
     track[_t].queued.end_point = track[_t].end_point
@@ -199,8 +199,8 @@ function loop.jump_to_cue(_t)
       end
       track[_t].start_point = track[_t].queued.start_point
       track[_t].end_point = track[_t].queued.end_point
-      set_softcut_param('loop_start',_t,track[_t].start_point)
-      set_softcut_param('loop_end',_t,track[_t].end_point)
+      set_softcut_param('loop_start',_t,track[_t].start_point - FADE_TIME)
+      set_softcut_param('loop_end',_t,track[_t].end_point - FADE_TIME)
     end
   )
 end
@@ -251,18 +251,13 @@ function loop.clear_track(_t)
   -- softcut.play(_t, 1)
   set_softcut_param('play',_t,1)
   track[_t].playing = false
-  -- softcut.position(_t, scaled[_t][2])
   -- softcut.rate(_t, 1) -- TODO CONFIRM THIS IS OK
   set_softcut_param('rate',_t,1)
-  -- softcut.loop_start(_t, scaled[_t][2])
   set_softcut_param('loop_start',_t,scaled[_t][2])
-  -- softcut.loop_end(_t, scaled[_t][3])
   set_softcut_param('loop_end',_t,scaled[_t][3])
-  -- softcut.position(_t, scaled[_t][2])
   set_softcut_param('position',_t,scaled[_t][2])
   track[_t].rec_limit = 0
-  -- TODO GENERALIZE:
-  -- softcut.buffer_clear_region_channel(scaled[_t][1],scaled[_t][2],global_duration)
+
   set_softcut_param('buffer clear', {scaled[_t][1],scaled[_t][2],global_duration})
 
   ray = speedlist[1][params:get("speed_voice_1")] -- TODO FIX
@@ -306,9 +301,7 @@ function loop.move_window(_t,direction)
 end
 
 function loop.refresh_softcut_loops(_t)
-  -- softcut.loop_start(_t,track[_t].start_point)
   set_softcut_param('loop_start',_t,track[_t].start_point)
-  -- softcut.loop_end(_t,track[_t].end_point)
   set_softcut_param('loop_end',_t,track[_t].end_point)
 end
 

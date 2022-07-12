@@ -65,18 +65,18 @@ function snapshot.unpack(voice, coll)
   if snapshots[voice][coll].restore.start_point then
     track[voice].start_point = snapshots[voice][coll].start_point
     -- softcut.loop_start(voice,track[voice].start_point)
-    set_softcut_param('loop_start',voice,track[voice].start_point)
+    set_softcut_param('loop_start',voice,track[voice].start_point - FADE_TIME)
   end
   if snapshots[voice][coll].restore.end_point then
     track[voice].end_point = snapshots[voice][coll].end_point
     -- softcut.loop_end(voice,track[voice].end_point)
-    set_softcut_param('loop_end',voice,track[voice].end_point)
+    set_softcut_param('loop_end',voice,track[voice].end_point - FADE_TIME)
   end
   -- softcut.position(voice,snapshots[voice][coll].poll_position)
   if (change_position and params:string("snapshot_restore_pos_"..voice) == "no") or
   (not change_position and params:string("snapshot_restore_pos_"..voice) == "yes") then
     -- softcut.position(voice,snapshots[voice][coll].start_point)
-    set_softcut_param('position',voice,snapshots[voice][coll].start_point)
+    set_softcut_param('position',voice,snapshots[voice][coll].start_point - FADE_TIME)
   end
   if snapshots[voice][coll].restore.rate then
     params:set("speed_voice_"..voice, snapshots[voice][coll].rate) -- TODO: could '.rate' be '.speed'?

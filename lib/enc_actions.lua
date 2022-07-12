@@ -90,7 +90,7 @@ function enc_actions.delta_end_point(_t,d,queue)
     track[_t].queued.end_point = util.clamp((util.round(track[_t].queued.end_point + d,0.01)), track[_t].queued.start_point + 0.01, global_duration + softcut_offsets[_t])
   else
     track[_t].end_point = util.clamp((util.round(track[_t].end_point + d,0.01)), track[_t].start_point + 0.01, global_duration + softcut_offsets[_t])
-    set_softcut_param('loop_end',_t,track[_t].end_point)
+    set_softcut_param('loop_end',_t,track[_t].end_point - FADE_TIME)
   end
 end
 
