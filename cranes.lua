@@ -1,7 +1,7 @@
 -- cranes
 -- dual looper / delay
 -- (grid optional)
--- v2.2 @dan_derks
+-- v2.2.1 @dan_derks
 -- https://llllllll.co/t/21207
 -- ---------------------
 -- to start:
@@ -599,7 +599,7 @@ function key(n,z)
         softcut.pre_level(1,1)
       elseif KEY1_press % 2 == 0 then
         softcut.rec_level(2,0)
-        sofcut.pre_level(2,1)
+        softcut.pre_level(2,1)
       end
       crane_redraw = 0
       crane2_redraw = 0
