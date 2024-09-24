@@ -88,8 +88,10 @@ for i = 1, TRACKS do
 	selected_preset[i] = 0
 end
 
-speedlist_1 = { -4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0 }
-speedlist_2 = { -4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0 }
+speedlist = {
+  { -4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0 },
+  { -4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0 }
+}
 overdub_strength = { 0.0, 0.0 }
 clear = true
 wiggle = 0.0
@@ -136,22 +138,22 @@ function init()
 
 	params:add_separator("playback rate")
 	params:add_number("speed_voice_1", "speed voice 1", 1, 11, 9, function(prm)
-		return speedlist_1[prm:get()] .. "x"
+		return speedlist[1][prm:get()] .. "x"
 	end)
 	params:set_action("speed_voice_1", function(x)
 		voice_speeds[1] = x
 		if all_loaded then
-			softcut.rate(1, speedlist_1[x] * semitone_offset)
+			softcut.rate(1, speedlist[1][x] * semitone_offset)
 			grid_dirty = true
 		end
 	end)
 	params:add_number("speed_voice_2", "speed voice 2", 1, 11, 9, function(prm)
-		return speedlist_2[prm:get()] .. "x"
+		return speedlist[2][prm:get()] .. "x"
 	end)
 	params:set_action("speed_voice_2", function(x)
 		voice_speeds[2] = x
 		if all_loaded then
-			softcut.rate(2, speedlist_2[x] * semitone_offset)
+			softcut.rate(2, speedlist[2][x] * semitone_offset)
 			grid_dirty = true
 		end
 	end)
@@ -162,8 +164,8 @@ function init()
 	params:set_action("offset", function(value)
 		if all_loaded then
 			semitone_offset = math.pow(0.5, -value / 12)
-			softcut.rate(1, speedlist_1[voice_speeds[1]] * semitone_offset)
-			softcut.rate(2, speedlist_2[voice_speeds[2]] * semitone_offset)
+			softcut.rate(1, speedlist[1][voice_speeds[1]] * semitone_offset)
+			softcut.rate(2, speedlist[2][voice_speeds[2]] * semitone_offset)
 		end
 	end)
 	params:add_separator("levels")
@@ -362,7 +364,7 @@ function preset_unpack(voice, set)
 end
 
 function warble()
-	local bufSpeed1 = speedlist_1[voice_speeds[1]]
+	local bufSpeed1 = speedlist[1][voice_speeds[1]]
 	if bufSpeed1 > 1.99 then
 		wiggle = bufSpeed1 + (math.random(-15, 15) / 1000)
 	elseif bufSpeed1 >= 1.0 then
@@ -376,38 +378,38 @@ function warble()
 end
 
 function half_speed()
-	wiggle = speedlist_1[voice_speeds[1]] / 2
+	wiggle = speedlist[1][voice_speeds[1]] / 2
 	softcut.rate_slew_time(1, 0.6 + (math.random(-30, 10) / 100))
 end
 
 function rev_speed()
-	wiggle = speedlist_1[voice_speeds[1]] * -1
+	wiggle = speedlist[1][voice_speeds[1]] * -1
 	softcut.rate_slew_time(1, 0.01)
 end
 
 function oneandahalf_speed()
-	wiggle = speedlist_1[voice_speeds[1]] * 1.5
+	wiggle = speedlist[1][voice_speeds[1]] * 1.5
 	softcut.rate_slew_time(1, 0.6 + (math.random(-30, 10) / 100))
 end
 
 function double_speed()
-	wiggle = speedlist_1[voice_speeds[1]] * 2
+	wiggle = speedlist[1][voice_speeds[1]] * 2
 	softcut.rate_slew_time(1, 0.6 + (math.random(-30, 10) / 100))
 end
 
 function restore_speed()
-	wiggle = speedlist_1[voice_speeds[1]]
+	wiggle = speedlist[1][voice_speeds[1]]
 	if KEY3 == 2 then
 		softcut.rate_slew_time(1, 0.01)
 	else
 		softcut.rate_slew_time(1, 0.6)
 	end
-	softcut.rate(1, speedlist_1[voice_speeds[1]] * semitone_offset)
+	softcut.rate(1, speedlist[1][voice_speeds[1]] * semitone_offset)
 end
 
 function clear_all()
 	init_voices()
-	wiggle = speedlist_1[voice_speeds[1]]
+	wiggle = speedlist[1][voice_speeds[1]]
 	track[1].start_point = 1
 	track[2].start_point = 1
 	track[1].end_point = 61
@@ -515,8 +517,8 @@ function record()
 		rec_time = 0
 		softcut.level(1, 1.0)
 		softcut.level(2, 1.0)
-		softcut.rate(1, speedlist_1[voice_speeds[1]] * semitone_offset)
-		softcut.rate(2, speedlist_2[voice_speeds[2]] * semitone_offset)
+		softcut.rate(1, speedlist[1][voice_speeds[1]] * semitone_offset)
+		softcut.rate(2, speedlist[2][voice_speeds[2]] * semitone_offset)
 	end
 	-- if the buffer is NOT clear and key 2 is pressed:
 	-- overwrite/overdub behavior will enable
@@ -756,31 +758,20 @@ g = grid.connect()
 -- hardware: grid event (eg 'what happens when a button is pressed')
 g.key = function(x, y, z)
 	-- speed + direction
-	if y == 1 and z == 1 then
-		if x <= #speedlist_1 then
-			params:set("speed_voice_1", x)
+	if (y == 1 or y == 5) and z == 1 then
+    local voice = y == 1 and 1 or 2
+    local other_voice = y == 1 and 2 or 1
+		if x <= #speedlist[voice] then
+			params:set("speed_voice_"..voice, x)
 		elseif x == 13 then
-			softcut.position(1, track[2].poll_position)
+			softcut.position(voice, track[other_voice].poll_position)
 		elseif x == 14 then
-			track[1].start_point = track[2].start_point
-			softcut.loop_start(1, track[1].start_point)
-			track[1].end_point = track[2].end_point
-			softcut.loop_end(1, track[1].end_point)
+			track[voice].start_point = track[other_voice].start_point
+			softcut.loop_start(voice, track[voice].start_point)
+			track[voice].end_point = track[other_voice].end_point
+			softcut.loop_end(voice, track[voice].end_point)
 		elseif x == 15 then
-			softcut.position(1, track[1].start_point)
-		end
-	elseif y == 5 and z == 1 then
-		if x <= #speedlist_2 then
-			params:set("speed_voice_2", x)
-		elseif x == 13 then
-			softcut.position(2, track[1].poll_position)
-		elseif x == 14 then
-			track[2].start_point = track[1].start_point
-			softcut.loop_start(2, track[2].start_point)
-			track[2].end_point = track[1].end_point
-			softcut.loop_end(2, track[2].end_point)
-		elseif x == 15 then
-			softcut.position(2, track[2].start_point)
+			softcut.position(voice, track[voice].start_point)
 		end
 	-- presets
 	elseif y == 2 or y == 6 then
@@ -827,10 +818,10 @@ function grid_redraw()
 	g:led(16, 2, 9)
 	g:led(15, 6, 3)
 	g:led(16, 6, 9)
-	for i = 1, #speedlist_1 do
+	for i = 1, #speedlist[1] do
 		g:led(i, 1, 5)
 	end
-	for i = 1, #speedlist_2 do
+	for i = 1, #speedlist[2] do
 		g:led(i, 5, 5)
 	end
 	for i = 13, 15 do
