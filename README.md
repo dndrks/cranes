@@ -23,7 +23,7 @@ quick start:
 **grid stuff:**
 
 - plug in a grid and re-boot cranes
-- use the following legend:
+- use the following legend (still valid for 2.3):
 ![cranes: grid interface legend](https://llllllll.co/uploads/default/original/3X/e/b/eb0fb77835e0a1fafc7afcaa85569408a03fcebf.jpeg)
 - *speed + direction*: -4x to 4x, 0 in the middle (unlit) functions as ‘pause’
 - *sync playhead to other*: sync the voice’s playhead to the location of the other’s
@@ -36,6 +36,12 @@ quick start:
 - *window adjustment*: adjust voice’s loop window by 0.01 second increments or by the distance between the start and end points
 
 **changelog:**
+
+*240923, cranes 2.3*
+- fixed buffer clearing issue
+- renamed params separators
+- sidestepped the worst of voice 2 -> buffer 1 recording overlaps
+- generic code optimization
 
 *5/7/2019, cranes 2.12*
 - exposed param for input levels
