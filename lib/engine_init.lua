@@ -444,19 +444,25 @@ function CheatCranes.init(track_count, poly)
 				elseif d.id == "sampleMode" then
 					params:set_action(i .. "_" .. v .. "_" .. d.id, function(x)
             if x == 3 then
-              send_to_engine("set_sample_mode", { i, "sampleFolder" })
+              if all_loaded then
+                send_to_engine("set_sample_mode", { i, "sampleFolder" })
+              end
               params:hide(i .. "_" .. v .. "_loopAtk")
               params:hide(i .. "_" .. v .. "_loopRel")
               params:hide(i .. "_" .. v .. "_sampleStart")
               params:hide(i .. "_" .. v .. "_sampleEnd")
             elseif x == 2 then
-              send_to_engine("set_sample_mode", { i, "samplePlaythrough" })
+              if all_loaded then
+                send_to_engine("set_sample_mode", { i, "samplePlaythrough" })
+              end
               params:show(i .. "_" .. v .. "_loopAtk")
               params:show(i .. "_" .. v .. "_loopRel")
               params:show(i .. "_" .. v .. "_sampleStart")
               params:show(i .. "_" .. v .. "_sampleEnd")
             elseif x == 1 then
-              send_to_engine("set_sample_mode", { i, "sample" })
+              if all_loaded then -- TODO: NOT ACTUALLY WHAT I WANT...
+                send_to_engine("set_sample_mode", { i, "sample" })
+              end
               params:show(i .. "_" .. v .. "_loopAtk")
               params:show(i .. "_" .. v .. "_loopRel")
               params:hide(i .. "_" .. v .. "_sampleStart")
@@ -696,7 +702,7 @@ function CheatCranes.init(track_count, poly)
   -- params:add_separator("kildare_lfo_header","kildare lfos")
   -- CheatCranes.lfos.add_params(track_count, CheatCranes.fx ,poly)
 
-  params:bang()
+  -- params:bang()
 
   CheatCranes.loaded = true
   
