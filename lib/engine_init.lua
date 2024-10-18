@@ -160,6 +160,7 @@ function CheatCranes.init(track_count, poly)
       {lfo_exclude = true, type = 'file', id = 'sampleFile', name = 'load', default = _path.audio},
       {lfo_exclude = true, type = 'binary', id = 'sampleClear', name = 'clear', behavior = 'momentary'},
       {lfo_exclude = true, type = 'control', id = 'sliceCount', name = 'slice count', min = 2, max = 48, warp = 'lin', default = 16, quantum = 1/46, formatter = function(param) return (round_form((type(param) == 'table' and param:get() or param),1,"")) end},
+      {lfo_exclude = true, type = 'option', id = 'repitch', name = 'repitch', options = {"no", "yes"}, default = 1},
       {type = 'separator', name = 'voice params'},
       {id = 'amp', name = 'amp', type = 'control', min = 0, max = 1.25, warp = 'lin', default = 0.7, quantum = 1/125, formatter = function(param) return (round_form((type(param) == 'table' and param:get() or param)*100,1,"%")) end},
       {id = 'loopAtk', name = 'loop attack', type = 'control', min = 0, max = 100, warp = 'lin', default = 5, quantum = 1/100, formatter = function(param) return (round_form((type(param) == 'table' and param:get() or param),1,"%")) end},
@@ -331,7 +332,7 @@ function CheatCranes.init(track_count, poly)
           local i = queued_inits[1].voice
           local model = queued_inits[1].model
           -- engine.init_voice(i, 'kildare_'..model)
-          send_to_engine('init_voice', {i, 'sample'})
+          -- send_to_engine('init_voice', {i, 'sample'})
           print('activating voice '..i)
           table.remove(queued_inits,1)
         end
@@ -460,9 +461,9 @@ function CheatCranes.init(track_count, poly)
               params:show(i .. "_" .. v .. "_sampleStart")
               params:show(i .. "_" .. v .. "_sampleEnd")
             elseif x == 1 then
-              if all_loaded then -- TODO: NOT ACTUALLY WHAT I WANT...
+              -- if all_loaded then -- TODO: NOT ACTUALLY WHAT I WANT...
                 send_to_engine("set_sample_mode", { i, "sample" })
-              end
+              -- end
               params:show(i .. "_" .. v .. "_loopAtk")
               params:show(i .. "_" .. v .. "_loopRel")
               params:hide(i .. "_" .. v .. "_sampleStart")

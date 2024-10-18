@@ -122,10 +122,12 @@ function ca.derive_bpm(source)
   end
 end
 
-function ca.get_resampled_rate(voice, i, j, pitched)
+function ca.get_resampled_rate(voice, pitched)
   local total_offset
   total_offset = params:get(voice..'_sample_playbackRateOffset')
-  local step_rate = hills[i][j].sample_controls.rate[hills[i][hills[i].segment].index]
+	-- TODO: per-pad values
+	-- local step_rate = hills[i][j].sample_controls.rate[hills[i][hills[i].segment].index]
+	local step_rate = 9
   total_offset = math.pow(0.5, -total_offset / 12) * sample_speedlist[step_rate]  
   if pitched then
     total_offset = total_offset * pitched
@@ -161,29 +163,31 @@ function ca.get_pitched_rate(target,i,j,played_note)
   end
 end
 
--- TODO: determine how i and j factor into real life...
-function ca.play_slice(target,slice,velocity,i,j, played_note, retrig_index)
+function ca.play_slice(target, slice, velocity, played_note, retrig_index)
   if params:get(target..'_sample_sampleFile') ~= _path.audio then
+    local i = target
     CheatCranes.allocVoice[i] = util.wrap(CheatCranes.allocVoice[i]+1, 1, params:get(i..'_poly_voice_count'))
-    local slice_count = params:get('hill '..i..' sample slice count')
+    local slice_count = params:get(i..'_sample_sliceCount')
     local sampleEnd = (slice)/slice_count
     local sampleStart = (slice-1)/slice_count
     send_to_engine('set_sample_bounds',{target,'sampleStart',(slice-1)/slice_count, CheatCranes.allocVoice[i]})
     send_to_engine('set_sample_bounds',{target,'sampleEnd',(slice)/slice_count, CheatCranes.allocVoice[i]})
     print('sample points: '..(slice-1)/slice_count,(slice)/slice_count)
     if params:string(target..'_sample_loop') == 'off' then
-      send_to_engine('set_voice_param',{target,'loop',hills[i][j].sample_controls.loop[hills[i][j].index] and 1 or 0})
+			-- TODO: individualize per pad...
+			-- send_to_engine('set_voice_param',{target,'loop',hills[i][j].sample_controls.loop[hills[i][j].index] and 1 or 0})
+			send_to_engine("set_voice_param", { target, "loop", 0 })
     else
       send_to_engine('set_voice_param',{target,'loop',1})
     end
     local rate
-    if params:string('hill '..i..' sample repitch') == "yes" and played_note ~= nil then
+    if params:string(i..'_sample_repitch') == "yes" and played_note ~= nil then
       rate = ca.get_pitched_rate(target,i,j,played_note)
     else
-      rate = ca.get_resampled_rate(target, i, j)
+      rate = ca.get_resampled_rate(target)
     end
     send_to_engine('set_voice_param',{target, 'rate', rate})
-    if retrig_index == 0 then
+    if retrig_index == 0 or retrig_index == nil then
       send_to_engine('trig',{target,velocity,'false',CheatCranes.allocVoice[i]})
       -- print('no trig '..CheatCranes.allocVoice[i])
     else
