@@ -4,6 +4,7 @@ local sample_speedlist = {-4, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 4}
 
 function ca.init(track_count)
   sample_info = {}
+  chosen_mode = {'chop','chop','chop'}
 
   sample_loop_info = {}
   for i = 1,track_count do
@@ -28,6 +29,7 @@ function ca.init(track_count)
     end
 		params:hide(voice .. "_sample_sliceCount")
 		menu_rebuild_queued = true
+    chosen_mode[voice] = 'folder'
   end
 
   function CheatCranes.file_callback(voice,file)
@@ -48,6 +50,7 @@ function ca.init(track_count)
 			end
 			menu_rebuild_queued = true
     end
+		chosen_mode[voice] = "chop"
   end
 
   function CheatCranes.clear_callback(voice)
@@ -83,7 +86,7 @@ function ca.folder_callback(file,dest)
   local folder = string.sub(file, 1, split_at)
   file = string.sub(file, split_at + 1)
   
-  ca.collage(folder,dest,1)
+  -- ca.collage(folder,dest,1)
 
 end
 
@@ -206,27 +209,33 @@ function ca.play_slice(target, slice, velocity, played_note, retrig_index)
   end
 end
 
-function ca.play_index(target,index,velocity,i,j, played_note, retrig_index)
-  CheatCranes.allocVoice[i] = util.wrap(CheatCranes.allocVoice[i]+1, 1, params:get(i..'_poly_voice_count'))
-  send_to_engine('change_sample',{target,index})
-  send_to_engine('set_voice_param',{target,'sampleStart',0})
-  send_to_engine('set_voice_param',{target,'sampleEnd',1})
-  if params:string(target..'_sample_loop') == 'off' then
-    send_to_engine('set_voice_param',{target,'loop',hills[i][j].sample_controls.loop[hills[i][j].index] and 1 or 0})
-  else
-    send_to_engine('set_voice_param',{target,'loop',1})
-  end
-  local rate
-  if params:string('hill '..i..' sample repitch') == "yes" and played_note ~= nil then
-    rate = ca.get_pitched_rate(target,i,j,played_note)
-  else
-    rate = ca.get_resampled_rate(target, i, j)
-  end
-  send_to_engine('set_voice_param',{target, 'rate', rate})
-  if retrig_index == 0 then
-    send_to_engine('trig',{target,velocity,'false',CheatCranes.allocVoice[i]})
-  else
-    send_to_engine('trig',{target,velocity,'true',CheatCranes.allocVoice[i]})
+function ca.play_index(target, index, velocity, played_note, retrig_index)
+  if params:get(target..'_sample_sampleFile') ~= _path.audio then
+		local i = target
+    CheatCranes.allocVoice[i] = util.wrap(CheatCranes.allocVoice[i]+1, 1, params:get(i..'_poly_voice_count'))
+    send_to_engine('change_sample',{target,index})
+    send_to_engine('set_voice_param',{target,'sampleStart',0})
+    send_to_engine('set_voice_param',{target,'sampleEnd',1})
+    if params:string(target..'_sample_loop') == 'off' then
+			-- TODO: individualize per pad...
+      -- send_to_engine('set_voice_param',{target,'loop',hills[i][j].sample_controls.loop[hills[i][j].index] and 1 or 0})
+			send_to_engine("set_voice_param", { target, "loop", 0 })
+    else
+      send_to_engine('set_voice_param',{target,'loop',1})
+    end
+    local rate
+    -- TODO: allow repitching...
+    if params:string(i..'_sample_repitch') == "yes" and played_note ~= nil then
+      rate = ca.get_pitched_rate(target,i,j,played_note)
+    else
+      rate = ca.get_resampled_rate(target)
+    end
+    send_to_engine('set_voice_param',{target, 'rate', rate})
+    if retrig_index == 0 then
+      send_to_engine('trig',{target,velocity,'false',CheatCranes.allocVoice[i]})
+    else
+      send_to_engine('trig',{target,velocity,'true',CheatCranes.allocVoice[i]})
+    end
   end
 end
 
@@ -287,6 +296,27 @@ function ca.play_through(target,velocity,i,j, played_note, retrig_index)
   else
     send_to_engine('trig',{target,velocity,'true',CheatCranes.allocVoice[i]})
   end
+end
+
+function ca.sc_to_SC(ch, voice, chop)
+  local yymmdd = os.date("%y%m%d")
+  local hms = os.date("%H%M%S")
+  local folder = _path.audio..'cheatcranes/'..yymmdd
+  util.make_dir(folder)
+  if not clear then
+		softcut.buffer_write_mono(folder .. "/" .. hms .. '.wav', track[ch].start_point, track[ch].end_point - 1, ch)
+  end
+  clock.run(
+    function()
+      clock.sleep(0.25)
+      if chop == true then
+        params:set(voice .. "_sample_sampleMode", 1)
+      else
+        params:set(voice .. "_sample_sampleMode", 2)
+      end
+      params:set(voice .. "_sample_sampleFile", folder .. "/" .. hms .. ".wav")
+    end
+  )
 end
 
 return ca

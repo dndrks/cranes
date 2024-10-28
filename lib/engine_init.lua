@@ -156,7 +156,7 @@ function CheatCranes.init(track_count, poly)
   cheatcranes_params = {
     ['sample'] = {
       {type = 'separator', name = 'sample management'},
-      {lfo_exclude = true, type = 'option', id = 'sampleMode', name = 'play mode', options = {"chop", "playthrough", "distribute"}, default = 1},
+      {lfo_exclude = true, type = 'option', id = 'sampleMode', name = 'play mode', options = {"chop", "playthrough", "folder"}, default = 1},
       {lfo_exclude = true, type = 'file', id = 'sampleFile', name = 'load', default = _path.audio},
       {lfo_exclude = true, type = 'binary', id = 'sampleClear', name = 'clear', behavior = 'momentary'},
       {lfo_exclude = true, type = 'control', id = 'sliceCount', name = 'slice count', min = 2, max = 48, warp = 'lin', default = 16, quantum = 1/46, formatter = function(param) return (round_form((type(param) == 'table' and param:get() or param),1,"")) end},
@@ -475,7 +475,7 @@ function CheatCranes.init(track_count, poly)
 				elseif d.id == "sampleFile" then
 					params:set_action(i .. "_" .. v .. "_" .. d.id, function(file)
 						if file ~= _path.audio then
-							if params:string(i .. "_" .. v .. "_sampleMode") == "distribute" then
+							if params:string(i .. "_" .. v .. "_sampleMode") == "folder" then
 								local split_at = string.match(file, "^.*()/")
 								local folder = string.sub(file, 1, split_at)
 								-- engine.load_folder(i,folder)
@@ -583,7 +583,7 @@ function CheatCranes.init(track_count, poly)
 
   if sox_installed then
     params:add_group('st_header','sample tools',6)
-    params:add_separator('st_notice', "for 'distribute' sample mode")
+    params:add_separator('st_notice', "for 'folder' sample mode")
     params:add_text('st_info', '')
     params:hide('st_info')
     -- _menu.rebuild_params()

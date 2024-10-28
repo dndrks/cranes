@@ -35,6 +35,11 @@ engine.name = "CheatCranes"
 CheatCranes = include 'lib/engine_init'
 _ca = include 'lib/clip'
 include 'lib/grid'
+_step = include 'lib/step'
+_tracks = include("lib/tracks")
+_tUi = include("lib/tracks_ui")
+_tEnc = include("lib/tracks_enc")
+_sequins = require 'sequins'
 
 function r()
 	norns.rerun()
@@ -67,7 +72,7 @@ for i = 1, TRACKS do
 		presets[i] = {}
 		preset_count[i] = 0
 		selected_preset[i] = 0
-		grid_dirty = true
+		hardware_dirty = true
 	end, 1.5, 1)
 	window_holds[i] = metro.init(function(x)
 		if x == 1 then
@@ -134,6 +139,7 @@ function init()
 
 	CheatCranes.init(3, true)
 	_ca.init(3)
+	_step.init()
 
 	audio.level_adc_cut(1)
 	audio.level_eng_cut(0)
@@ -144,6 +150,72 @@ function init()
 
 	init_voices()
 
+	params:add_separator('sequencer')
+	for i = 1,8 do
+		_tracks.init(i,1)
+		params:add_option("iterator_"..i, "iterator", { "norns", "external MIDI clock", "external MIDI note" }, 1)
+		params:set_action("iterator_"..i, function(x)
+			if x == 1 then
+				if not clock.threads[sequence[i].clock] then
+					local _page = sequence[i][sequence[i].active_hill].page
+					sequence[i][sequence[i].active_hill][_page].micro[0] = sequence[i][sequence[i].active_hill][_page].micro[1]
+					_tracks.start_playback(i, sequence[i].active_hill)
+					sequence[i].clock = clock.run(_tracks.iterate, i)
+				end
+				-- params:hide("hill_" .. i .. "_iterator_midi_device")
+				-- params:hide("hill_" .. i .. "_iterator_midi_note")
+				-- params:hide("hill_" .. i .. "_iterator_midi_velocity_lo")
+				-- params:hide("hill_" .. i .. "_iterator_midi_velocity_hi")
+				-- params:hide("hill_" .. i .. "_iterator_midi_record")
+				-- for j = 1, 8 do
+				-- 	if i ~= j then
+				-- 		params:hide("hill_" .. i .. "_iterator_hill_" .. j, "hill " .. j)
+				-- 		params:hide("hill_" .. i .. "_iterator_hill_" .. j .. "_pulse_count")
+				-- 	end
+				-- end
+				menu_rebuild_queued = true
+			elseif x == 2 then
+				if clock.threads[sequence[i].clock] then
+					clock.cancel(sequence[i].clock)
+					_tracks.stop_playback(i)
+				end
+				params:show("hill_" .. i .. "_iterator_midi_device")
+				params:show("hill_" .. i .. "_iterator_midi_note")
+				params:show("hill_" .. i .. "_iterator_midi_velocity_lo")
+				params:show("hill_" .. i .. "_iterator_midi_velocity_hi")
+				params:show("hill_" .. i .. "_iterator_midi_record")
+				for j = 1, 8 do
+					if i ~= j then
+						params:hide("hill_" .. i .. "_iterator_hill_" .. j)
+						params:hide("hill_" .. i .. "_iterator_hill_" .. j .. "_pulse_count")
+					end
+				end
+				menu_rebuild_queued = true
+			elseif x == 3 then
+				if clock.threads[sequence[i].clock] then
+					clock.cancel(sequence[i].clock)
+					_tracks.stop_playback(i)
+				end
+				params:hide("hill_" .. i .. "_iterator_midi_device")
+				params:hide("hill_" .. i .. "_iterator_midi_note")
+				params:hide("hill_" .. i .. "_iterator_midi_velocity_lo")
+				params:hide("hill_" .. i .. "_iterator_midi_velocity_hi")
+				params:hide("hill_" .. i .. "_iterator_midi_record")
+				for j = 1, 8 do
+					if i ~= j then
+						params:show("hill_" .. i .. "_iterator_hill_" .. j)
+						if params:get("hill_" .. i .. "_iterator_hill_" .. j) ~= 1 then
+							params:show("hill_" .. i .. "_iterator_hill_" .. j .. "_pulse_count")
+						end
+					end
+				end
+				menu_rebuild_queued = true
+			end
+		end)
+	end
+
+	_tUi.init()
+
 	params:add_separator("playback rate")
 	params:add_number("speed_voice_1", "speed voice 1", 1, 11, 9, function(prm)
 		return speedlist[1][prm:get()] .. "x"
@@ -152,7 +224,7 @@ function init()
 		voice_speeds[1] = x
 		if all_loaded then
 			softcut.rate(1, speedlist[1][x] * semitone_offset)
-			grid_dirty = true
+			hardware_dirty = true
 		end
 	end)
 	params:add_number("speed_voice_2", "speed voice 2", 1, 11, 9, function(prm)
@@ -162,7 +234,7 @@ function init()
 		voice_speeds[2] = x
 		if all_loaded then
 			softcut.rate(2, speedlist[2][x] * semitone_offset)
-			grid_dirty = true
+			hardware_dirty = true
 		end
 	end)
 	--
@@ -318,18 +390,18 @@ function init()
 	end, 1 / 30, -1)
 	hardware_redraw:start()
 
-	grid_dirty = true
+	hardware_dirty = true
 	screen_dirty = true
 end
 
 function grid.add()
-	grid_dirty = true
+	hardware_dirty = true
 end
 
 function draw_hardware()
-	if grid_dirty then
+	if hardware_dirty then
 		grid_redraw()
-		grid_dirty = false
+		hardware_dirty = false
 	end
 	if screen_dirty then
 		redraw()
@@ -344,7 +416,7 @@ phase = function(n, x)
 	if spot ~= track[n].pos_grid then
 		track[n].pos_grid = spot
 	end
-	grid_dirty = true
+	hardware_dirty = true
 	screen_dirty = true
 end
 
@@ -368,7 +440,7 @@ function preset_unpack(voice, set)
 	params:set("speed_voice_" .. voice, presets[voice][set].speed)
 	selected_preset[voice] = set
 	screen_dirty = true
-	grid_dirty = true
+	hardware_dirty = true
 end
 
 function warble()
@@ -427,7 +499,7 @@ function clear_all()
 	rec_time = 0
 	recording = false
 	crane_redraw = { 0, 0 }
-	grid_dirty = true
+	hardware_dirty = true
 	screen_dirty = true
 	KEY3_hold = false
 	track[1].poll_position = 1
@@ -618,46 +690,50 @@ end
 -- encoder hardware interaction
 function enc(n, d)
 	if all_loaded then
-		-- encoder 3: voice 1's loop end point
-		if n == 3 and KEY1_press % 2 == 0 then
-			track[1].end_point = util.clamp((track[1].end_point + d / 10), 1.0, 61.0)
-			softcut.loop_end(1, track[1].end_point)
-			screen_dirty = true
+		if not show_me_steps then
+			-- encoder 3: voice 1's loop end point
+			if n == 3 and KEY1_press % 2 == 0 then
+				track[1].end_point = util.clamp((track[1].end_point + d / 10), 1.0, 61.0)
+				softcut.loop_end(1, track[1].end_point)
+				screen_dirty = true
 
-		-- encoder 2: voice 1's loop start point
-		elseif n == 2 and KEY1_press % 2 == 0 then
-			track[1].start_point = util.clamp((track[1].start_point + d / 10), 1.0, 61.0)
-			softcut.loop_start(1, track[1].start_point)
-			screen_dirty = true
+			-- encoder 2: voice 1's loop start point
+			elseif n == 2 and KEY1_press % 2 == 0 then
+				track[1].start_point = util.clamp((track[1].start_point + d / 10), 1.0, 61.0)
+				softcut.loop_start(1, track[1].start_point)
+				screen_dirty = true
 
-		-- encoder 3: voice 2's loop end point
-		elseif n == 3 and KEY1_press % 2 == 1 then
-			track[2].end_point = util.clamp((track[2].end_point + d / 10), 1.0, 61.0)
-			softcut.loop_end(2, track[2].end_point)
-			screen_dirty = true
+			-- encoder 3: voice 2's loop end point
+			elseif n == 3 and KEY1_press % 2 == 1 then
+				track[2].end_point = util.clamp((track[2].end_point + d / 10), 1.0, 61.0)
+				softcut.loop_end(2, track[2].end_point)
+				screen_dirty = true
 
-		-- encoder 2: voice 2's loop start point
-		elseif n == 2 and KEY1_press % 2 == 1 then
-			track[2].start_point = util.clamp((track[2].start_point + d / 10), 1.0, 61.0)
-			softcut.loop_start(2, track[2].start_point)
-			screen_dirty = true
+			-- encoder 2: voice 2's loop start point
+			elseif n == 2 and KEY1_press % 2 == 1 then
+				track[2].start_point = util.clamp((track[2].start_point + d / 10), 1.0, 61.0)
+				softcut.loop_start(2, track[2].start_point)
+				screen_dirty = true
 
-		-- encoder 1: voice 1's overwrite/overdub amount
-		-- 0 is full overdub
-		-- 1 is full overwrite
-		elseif n == 1 then
-			if KEY1_press % 2 == 0 then
-				overdub_strength[1] = util.clamp((overdub_strength[1] + d / 100), 0.0, 1.0)
-				if recording == true then
-					softcut.pre_level(1, math.abs(overdub_strength[1] - 1))
+			-- encoder 1: voice 1's overwrite/overdub amount
+			-- 0 is full overdub
+			-- 1 is full overwrite
+			elseif n == 1 then
+				if KEY1_press % 2 == 0 then
+					overdub_strength[1] = util.clamp((overdub_strength[1] + d / 100), 0.0, 1.0)
+					if recording == true then
+						softcut.pre_level(1, math.abs(overdub_strength[1] - 1))
+					end
+				elseif KEY1_press % 2 == 1 then
+					overdub_strength[2] = util.clamp((overdub_strength[2] + d / 100), 0.0, 1.0)
+					if recording == true then
+						softcut.pre_level(2, math.abs(overdub_strength[2] - 1))
+					end
 				end
-			elseif KEY1_press % 2 == 1 then
-				overdub_strength[2] = util.clamp((overdub_strength[2] + d / 100), 0.0, 1.0)
-				if recording == true then
-					softcut.pre_level(2, math.abs(overdub_strength[2] - 1))
-				end
+				screen_dirty = true
 			end
-			screen_dirty = true
+		else
+			_tEnc.parse(n,d)
 		end
 	end
 end
@@ -665,37 +741,41 @@ end
 -- displaying stuff on the screen
 function redraw()
 	screen.clear()
-	screen.level(15)
-	screen.move(0, 50)
-	if KEY1_press % 2 == 1 then
-		screen.text("s2: " .. util.round(track[2].start_point - 1, 0.01))
-	elseif KEY1_press % 2 == 0 then
-		screen.text("s1: " .. util.round(track[1].start_point - 1, 0.01))
-	end
-	screen.move(0, 60)
-	if KEY1_press % 2 == 1 then
-		screen.text("e2: " .. util.round(track[2].end_point - 1, 0.01))
-	elseif KEY1_press % 2 == 0 then
-		screen.text("e1: " .. util.round(track[1].end_point - 1, 0.01))
-	end
-	screen.move(0, 40)
-	if KEY1_press % 2 == 1 then
-		screen.text("o2: " .. overdub_strength[2])
-	elseif KEY1_press % 2 == 0 then
-		screen.text("o1: " .. overdub_strength[1])
-	end
-	if crane_redraw[1] == 1 then
-		if crane_redraw[2] == 0 then
-			crane()
-		else
-			crane2()
+	if not show_me_steps then
+		screen.level(15)
+		screen.move(0, 50)
+		if KEY1_press % 2 == 1 then
+			screen.text("s2: " .. util.round(track[2].start_point - 1, 0.01))
+		elseif KEY1_press % 2 == 0 then
+			screen.text("s1: " .. util.round(track[1].start_point - 1, 0.01))
 		end
+		screen.move(0, 60)
+		if KEY1_press % 2 == 1 then
+			screen.text("e2: " .. util.round(track[2].end_point - 1, 0.01))
+		elseif KEY1_press % 2 == 0 then
+			screen.text("e1: " .. util.round(track[1].end_point - 1, 0.01))
+		end
+		screen.move(0, 40)
+		if KEY1_press % 2 == 1 then
+			screen.text("o2: " .. overdub_strength[2])
+		elseif KEY1_press % 2 == 0 then
+			screen.text("o1: " .. overdub_strength[1])
+		end
+		if crane_redraw[1] == 1 then
+			if crane_redraw[2] == 0 then
+				crane()
+			else
+				crane2()
+			end
+		end
+		screen.level(3)
+		screen.move(0, 10)
+		screen.text("one: " .. (math.floor(track[1].poll_position * 10) / 10) - 1)
+		screen.move(0, 20)
+		screen.text("two: " .. (math.floor(track[2].poll_position * 10) / 10) - 1)
+	else
+		_tUi.draw_menu()
 	end
-	screen.level(3)
-	screen.move(0, 10)
-	screen.text("one: " .. (math.floor(track[1].poll_position * 10) / 10) - 1)
-	screen.move(0, 20)
-	screen.text("two: " .. (math.floor(track[2].poll_position * 10) / 10) - 1)
 	screen.update()
 end
 

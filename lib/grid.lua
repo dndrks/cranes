@@ -11,7 +11,7 @@ g.key = function(x, y, z)
 	elseif y > 8 then
     parse_cheat(x,y,z)
   end
-	grid_dirty = true
+	hardware_dirty = true
 end
 
 grid_coordinates = {
@@ -37,8 +37,12 @@ function parse_cheat(x,y,z)
     end
     y = size == 256 and y-8 or y
     if x >= grid_coordinates[size].squares[bank_source][1] and x <= grid_coordinates[size].squares[bank_source][1] + 3 then
-      local which_slice = x - (6*(bank_source-1)) + (4*(y-5))
-      _ca.play_slice(bank_source,which_slice, 127)
+      local which_pad = x - (6*(bank_source-1)) + (4*(y-5))
+			if chosen_mode[bank_source] == 'chop' then
+      	_ca.play_slice(bank_source,which_pad, 127)
+			elseif chosen_mode[bank_source] == 'folder' then
+				_ca.play_index(bank_source,which_pad, 127)
+			end
     end
   end
 end
@@ -97,6 +101,7 @@ function grid_redraw()
 	draw_cheat(1, 13)
 	draw_cheat(7, 13)
 	draw_cheat(13, 13)
+	_step.draw_grid(1)
 	g:refresh()
 end
 
