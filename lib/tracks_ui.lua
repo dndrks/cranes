@@ -10,13 +10,22 @@ function trx_ui.init()
 	ui.control_set = "play"
 	ui.display_style = "single"
 	ui.edit_note = {}
-	ui.hill_focus = 1
+	ui.seq_focus = 1
 	ui.menu_focus = 1
 	ui.screen_controls = {}
 	ui.seq_menu_focus = 1
 	ui.seq_menu_layer = "nav"
 	ui.seq_controls = {}
 	ui.pattern_focus = { "s1", "s1", "s1", "s1" }
+
+	ui.popup_focus = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }
+	ui.popup_focus.tracks = {}
+	for i = 1, number_of_sequencers do
+		ui.popup_focus.tracks[i] = {}
+		for j = 1, 8 do
+			ui.popup_focus.tracks[i][j] = 1
+		end
+	end
 
   for i = 1,8 do
     ui.seq_controls[i] =
@@ -55,72 +64,65 @@ end
 
 function trx_ui.draw_menu()
 
-  local hf = ui.hill_focus
-  -- local h = hills[hf]
-  local h = {screen_focus = 1}
+  local hf = ui.seq_focus
   local _page = tracks_ui.seq_page[hf]
-  local _active = sequence[hf][h.screen_focus]
-  local _a = sequence[hf][h.screen_focus][_page]
+  local _target = sequence[hf]
+  local _a = sequence[hf][_page]
   screen.level(15)
   screen.move(0,10)
   screen.aa(1)
   screen.font_size(10)
-  -- screen.text(hill_names[ui.hill_focus])
+  -- screen.text(hill_names[ui.seq_focus])
   screen.fill()
   screen.aa(0)
   if ui.control_set ~= "seq" then
     if ui.control_set ~= 'step parameters' and ui.control_set ~= 'poly parameters' and ui.control_set ~= 'cc parameters' then
-      local focus = h.screen_focus
-      local seg = h[focus]
+      local focus = hf
       screen.level(1)
-      screen.rect(31,15,97,30)
+      screen.rect(31,5,97,30)
       screen.fill()
       -- local s_c = ui.screen_controls[hf][focus]
-      local menus = {"hwy: "..focus,"bound","notes","loop","smpl"}
+      local menus = {"seq: "..focus,"bound","notes","loop","smpl"}
       screen.font_size(8)
       if ui.control_set == "edit" and ui.menu_focus ~= 1 then
         screen.move(0,22)
         screen.level(3)
-        screen.text("hwy: "..focus)
+        screen.text("seq: "..focus)
       elseif ui.control_set == "edit" and ui.menu_focus == 1 then
-        screen.move(31,12)
+        screen.move(0,32)
         screen.level(3)
-        screen.text("step: ".._active.ui_position)
+        screen.text("stp: ".._a.ui_position)
       end
       local upper_bound = 5
       for i = 1,upper_bound do
         screen.level(ui.menu_focus == i and (key1_hold and ((ui.menu_focus > 2 and  ui.control_set == "edit") and 3 or 15) or 15) or 3)
         screen.move(0,12+(10*i))
         if ui.control_set == "edit" and ui.menu_focus == i then
-          if h.highway == true then
-            screen.text(menus[i])
-          else
-            screen.text("["..menus[i].."]")
-          end
+					screen.text(menus[i])
         elseif ui.control_set ~= "edit" then
           screen.text(menus[i])
         end
       end
 
-      local focused_set = _active.focus == "main" and _a or _a.fill
+      local focused_set = _a.focus == "main" and _a or _a.fill
       screen.move(0,10)
       screen.level(3)
       screen.level(_hui.focus == "seq" and 8 or 0)
-      local e_pos = sequence[hf][h.screen_focus].ui_position
-      screen.rect(31+(trx_ui.index_to_grid_pos(e_pos,8)[1]-1)*12,6+(10*trx_ui.index_to_grid_pos(e_pos,8)[2]),13,8)
+      local e_pos = sequence[hf][_page].ui_position
+      screen.rect(31+(trx_ui.index_to_grid_pos(e_pos,8)[1]-1)*12,(10*trx_ui.index_to_grid_pos(e_pos,8)[2])-4,13,8)
       screen.fill()
       local lvl = 5
       screen.font_face(2)
       for i = 1,24 do
         if e_pos == i then
-          if _active.step == i and _active.playing and tracks_ui.seq_page[hf] == _active.page then
+          if _a.step == i and _a.playing and tracks_ui.seq_page[hf] == _target.page then
             lvl = _hui.focus == "seq" and 5 or 4
           else
             lvl = _hui.focus == "seq" and 0 or 2
           end
         else
           if i <= _a.end_point and i >= _a.start_point then
-            if _active.step == i and tracks_ui.seq_page[hf] == _active.page then
+            if _a.step == i and tracks_ui.seq_page[hf] == _target.page then
               lvl = _hui.focus == "seq" and 15 or 4
             else
               lvl = _hui.focus == "seq" and 5 or 2
@@ -130,7 +132,7 @@ function trx_ui.draw_menu()
           end
         end
         screen.level(lvl)
-        screen.move(37+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,13+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+        screen.move(37+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,3+(10*trx_ui.index_to_grid_pos(i,8)[2]))
         local display_step_data
         if ui.menu_focus ~= 3 then
           if focused_set.trigs[i] then
@@ -205,48 +207,48 @@ function trx_ui.draw_menu()
           if focused_set.prob[i] ~= 100 then
             if focused_set.prob[i] <= 20 then
               for pix = 33,34 do
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,12+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,2+(10*trx_ui.index_to_grid_pos(i,8)[2]))
               end
             elseif focused_set.prob[i] <= 40 then
               for pix = 33,34 do
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,11+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,12+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,1+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,2+(10*trx_ui.index_to_grid_pos(i,8)[2]))
               end
             elseif focused_set.prob[i] <= 60 then
               for pix = 33,34 do
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,10+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,11+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,12+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,0+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,1+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,2+(10*trx_ui.index_to_grid_pos(i,8)[2]))
               end
             elseif focused_set.prob[i] <= 80 then
               for pix = 33,34 do
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,9+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,10+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,11+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,12+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,(10*trx_ui.index_to_grid_pos(i,8)[2])-1)
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,0+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,1+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,2+(10*trx_ui.index_to_grid_pos(i,8)[2]))
               end
             elseif focused_set.prob[i] < 100 then
               for pix = 33,34 do
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,8+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,9+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,10+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,11+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,12+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,(10*trx_ui.index_to_grid_pos(i,8)[2])-2)
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,(10*trx_ui.index_to_grid_pos(i,8)[2])-1)
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,0+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,1+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+                screen.pixel(pix+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,2+(10*trx_ui.index_to_grid_pos(i,8)[2]))
               end
             end
             screen.fill()
           end
           if focused_set.conditional.A[i] ~= 1 or focused_set.conditional.B[i] ~= 1 then
-            screen.pixel(40+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,7+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-            screen.pixel(42+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,7+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+            screen.pixel(40+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,(10*trx_ui.index_to_grid_pos(i,8)[2])-3)
+            screen.pixel(42+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,(10*trx_ui.index_to_grid_pos(i,8)[2])-3)
             screen.fill()
           end
           if focused_set.conditional.retrig_count[i] > 0 then
-            screen.pixel(41+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,10+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-            screen.pixel(42+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,11+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-            screen.pixel(41+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,11+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-            screen.pixel(40+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,11+(10*trx_ui.index_to_grid_pos(i,8)[2]))
-            screen.pixel(41+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,12+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+            screen.pixel(41+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,0+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+            screen.pixel(42+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,1+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+            screen.pixel(41+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,1+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+            screen.pixel(40+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,1+(10*trx_ui.index_to_grid_pos(i,8)[2]))
+            screen.pixel(41+(trx_ui.index_to_grid_pos(i,8)[1]-1)*12,2+(10*trx_ui.index_to_grid_pos(i,8)[2]))
             screen.fill()
           end
         end
@@ -259,6 +261,7 @@ function trx_ui.draw_menu()
         screen.move(128,64)
         screen.text_right("K3: PER-STEP PARAMS")
       else
+        -- PAGE DISPLAY (bottom right)
         for i = 1,8 do
           lvl = _hui.seq_page[hf] == i and 10 or 2
           screen.level(lvl)
@@ -283,23 +286,23 @@ function trx_ui.draw_menu()
           end
         end
         screen.move(128,10)
-        screen.text_right(sequence[hf][h.screen_focus].focus == "fill" and "[FILL]" or "")
+        screen.text_right(sequence[hf][_page].focus == "fill" and "[FILL]" or "")
       elseif ui.menu_focus == 2 then
-        local s_c = ui.screen_controls[hf][h.screen_focus]
+        local s_c = ui.screen_controls[hf][_page]
         if ui.control_set == 'play' then
           screen.level(3)
         else
           screen.level(s_c["bounds"]["focus"] == 1 and 15 or 3)
         end
         screen.move(32,10)
-        screen.text("min: "..sequence[hf][h.screen_focus][_page].start_point)
+        screen.text("min: "..sequence[hf][_page][_page].start_point)
         if ui.control_set == 'play' then
           screen.level(3)
         else
           screen.level(s_c["bounds"]["focus"] == 1 and 3 or 15)
         end
         screen.move(128,10)
-        screen.text_right("max: "..sequence[hf][h.screen_focus][_page].end_point)
+        screen.text_right("max: "..sequence[hf][_page][_page].end_point)
       elseif ui.menu_focus == 3 then
         if ui.control_set == 'edit' then
           local pos = _active.ui_position
@@ -324,7 +327,7 @@ function trx_ui.draw_menu()
       end
 
       -- if (key1_hold or (#conditional_entry_steps.focus[hf] > 0)) and ui.control_set == 'edit' then
-      local current_step = sequence[hf][h.screen_focus].ui_position
+      local current_step = sequence[hf][_page].ui_position
       if ui.menu_focus == 1 and ui.control_set ~= 'play' then
         local lvl_sel, lvl_other
         if (key1_hold or (#conditional_entry_steps.focus[hf] > 0)) and ui.control_set == 'edit' then
@@ -337,7 +340,7 @@ function trx_ui.draw_menu()
         -- draw_popup("->")
         -- screen.move(40,20)
         screen.move(32,42)
-        screen.level(_s.popup_focus.tracks[hf][1] == 1 and lvl_sel or lvl_other)
+        screen.level(ui.popup_focus.tracks[hf][1] == 1 and lvl_sel or lvl_other)
         local base, line_above
         if focused_set.conditional.mode[current_step] == "NOT PRE" then
           base = "PRE"
@@ -360,16 +363,16 @@ function trx_ui.draw_menu()
           screen.stroke()
         end
         screen.move(84,42)
-        screen.level(_s.popup_focus.tracks[hf][1] == 2 and lvl_sel or lvl_other)
+        screen.level(ui.popup_focus.tracks[hf][1] == 2 and lvl_sel or lvl_other)
         screen.text('PROB: '..focused_set.prob[current_step]..'%')
         screen.move(32,52)
-        screen.level(_s.popup_focus.tracks[hf][1] == 3 and lvl_sel or lvl_other)
+        screen.level(ui.popup_focus.tracks[hf][1] == 3 and lvl_sel or lvl_other)
         screen.text('RETRIG: '..focused_set.conditional.retrig_count[current_step]..'x')
-        screen.level(_s.popup_focus.tracks[hf][1] == 4 and lvl_sel or lvl_other)
-        local get_string = _active.focus == 'main' and ('track_retrig_time_'..hf..'_'..h.screen_focus..'_'.._page..'_'..current_step) or ('track_fill_retrig_time_'..hf..'_'..h.screen_focus..'_'.._page..'_'..current_step)
+        screen.level(ui.popup_focus.tracks[hf][1] == 4 and lvl_sel or lvl_other)
+        local get_string = _a.focus == 'main' and ('track_retrig_time_'..hf..'_'.._page..'_'..current_step) or ('track_fill_retrig_time_'..hf..'_'.._page..'_'..current_step)
         screen.move(84,52)
         screen.text('RATE: '..track_paramset:string(get_string))
-        screen.level(_s.popup_focus.tracks[hf][1] == 5 and lvl_sel or lvl_other)
+        screen.level(ui.popup_focus.tracks[hf][1] == 5 and lvl_sel or lvl_other)
         screen.move(32,62)
         local show_sign = focused_set.conditional.retrig_slope[current_step] > 0 and '+' or ''
         screen.text('SLOPE: '..show_sign..focused_set.conditional.retrig_slope[current_step])
@@ -379,30 +382,30 @@ function trx_ui.draw_menu()
         screen.level(15)
         screen.text('[EUCLID]')
         screen.move(55,20)
-        screen.level(_s.popup_focus.tracks[hf][2] == 1 and 15 or 4)
+        screen.level(ui.popup_focus.tracks[hf][2] == 1 and 15 or 4)
         screen.text('PULSES: '..focused_set.er.pulses)
         screen.move(55,30)
-        screen.level(_s.popup_focus.tracks[hf][2] == 2 and 15 or 4)
+        screen.level(ui.popup_focus.tracks[hf][2] == 2 and 15 or 4)
         screen.text('STEPS: '..focused_set.er.steps)
         screen.move(55,40)
-        screen.level(_s.popup_focus.tracks[hf][2] == 3 and 15 or 4)
+        screen.level(ui.popup_focus.tracks[hf][2] == 3 and 15 or 4)
         screen.text('SHIFT: '..focused_set.er.shift)
         screen.move(55,50)
-        screen.level(_s.popup_focus.tracks[hf][2] == 4 and 15 or 4)
+        screen.level(ui.popup_focus.tracks[hf][2] == 4 and 15 or 4)
         screen.text('GENERATE (K3)')
       elseif ui.menu_focus == 3 then
         draw_popup(norns.state.path..'img/keys.png',9,17)
         screen.move(55,20)
-        screen.level(_s.popup_focus.tracks[hf][3] == 1 and 15 or 4)
+        screen.level(ui.popup_focus.tracks[hf][3] == 1 and 15 or 4)
         screen.text('VELOCITY: '..focused_set.velocities[current_step])
         screen.move(55,30)
-        screen.level(_s.popup_focus.tracks[hf][3] == 2 and 15 or 4)
+        screen.level(ui.popup_focus.tracks[hf][3] == 2 and 15 or 4)
         screen.text('CHORD DEG: '..focused_set.chord_degrees[current_step])
         -- screen.move(55,40)
-        -- screen.level(_s.popup_focus.tracks[hf][2] == 3 and 15 or 4)
+        -- screen.level(ui.popup_focus.tracks[hf][2] == 3 and 15 or 4)
         -- screen.text('SHIFT: '..focused_set.er.shift)
         -- screen.move(55,50)
-        -- screen.level(_s.popup_focus.tracks[hf][2] == 4 and 15 or 4)
+        -- screen.level(ui.popup_focus.tracks[hf][2] == 4 and 15 or 4)
         -- screen.text('GENERATE (K3)')
       end
       -- elseif grid_conditional_entry and #conditional_entry_steps.focus[hf] == 0 and ui.control_set == 'edit' then
@@ -421,6 +424,62 @@ function trx_ui.draw_menu()
       _polyparams.redraw()
     elseif ui.control_set == 'cc parameters' then
       _ccparams.redraw()
+    end
+  end
+end
+
+function trx_ui.parse_grid(x,y,z)
+	local hf = ui.seq_focus
+	local _page = tracks_ui.seq_page[hf]
+	local _target = sequence[hf]
+	local _a = sequence[hf][_page]
+  local i = ui.seq_focus
+  local j = tracks_ui.seq_page[i]
+	local focused_set = _a.focus == "main" and _a or _a.fill
+  if x >= 9 and y >= 9 and y <= 11 and z == 1 then
+    sequence[i][j].ui_position = ((y-9)*8) + (x-8)
+		_tracks.change_trig_state(focused_set, sequence[i][j].ui_position, not focused_set.trigs[sequence[i][j].ui_position], i, j, _page)
+  end
+end
+
+function trx_ui.draw_grid(v)
+  if ui.control_set == 'play' or ui.control_set == 'edit' then
+    -- local p = sequence[v].page
+    local p = tracks_ui.seq_page[v]
+		local this_seq = sequence[v][p]
+		-- local this_seq = tracks_ui.seq_page[v]
+    for s = this_seq.start_point, this_seq.end_point do
+      local x = util.wrap(s,1,8)
+      local batch = s <= 8 and 1 or (s<= 16 and 2 or 3)
+      local brightness
+      if this_seq.step == s and sequence[v].playing then
+        brightness = this_seq.trigs[s] and 15 or 10
+      else
+        brightness = this_seq.trigs[s] and 5 or 2
+      end
+      g:led(x+8, batch+8, brightness)
+    end
+  elseif ui.control_set == 'step_parameters' then
+		for s = step.seq[v].locks.start_point, step.seq[v].locks.end_point do
+			local x = util.wrap(s, 1, 8)
+			local batch = s <= 8 and 1 or (s <= 16 and 2 or 3)
+			local brightness
+			if step.seq[v].current_step == s and sequence[v].playing then
+				brightness = step.seq[v].locks[s].active and 15 or 10
+			else
+				brightness = step.seq[v].locks[s].active and 5 or 2
+			end
+			g:led(x + 8, batch + 8, brightness)
+		end
+  elseif ui.control_set == 'rotate' then
+    for s = 0,15 do
+      local brightness
+      if s == math.abs(step.seq[v].step_offset) then
+        brightness = step.seq[v].step_offset >= 0 and 10 or 0
+      else
+        brightness = step.seq[v].step_offset >= 0 and 3 or 10
+      end
+      g:led(s+1,v,brightness)
     end
   end
 end
@@ -514,7 +573,7 @@ end
 
 function trx_ui.cycle_retrig_time(i,j,step,d)
   local _active = sequence[i][j]
-  local focused_set = _active.focus == 'main' and ('track_retrig_time_'..i..'_'..j..'_'.._active.page..'_'..step) or ('track_fill_retrig_time_'..i..'_'..j..'_'.._active.page..'_'..step)
+  local focused_set = _active.focus == 'main' and ('track_retrig_time_'..i..'_'..j..'_'.._active.page..'_'..step) or ('track_fill_retrig_time_'..i..'_'.._active.page..'_'..step)
   track_paramset:delta(focused_set,d)
 end
 

@@ -2,24 +2,26 @@ local enc_actions = {}
 
 function enc_actions.delta_track_pos(i, j, d, jump_page)
 	if not jump_page then
+		print("before", i, j, sequence[i][j].ui_position,tracks_ui.seq_page[i])
 		if sequence[i][j].ui_position + d < 1 then
-			local pre_change = highway_ui.seq_page[i]
-			highway_ui.seq_page[i] = util.clamp(highway_ui.seq_page[i] - 1, 1, 8)
-			if pre_change ~= highway_ui.seq_page[i] then
-				sequence[i][j].ui_position = 16
+			local pre_change = tracks_ui.seq_page[i]
+			tracks_ui.seq_page[i] = util.clamp(tracks_ui.seq_page[i] - 1, 1, 8)
+			if pre_change ~= tracks_ui.seq_page[i] then
+				sequence[i][tracks_ui.seq_page[i]].ui_position = 24
 			end
-		elseif sequence[i][j].ui_position + d > 16 then
-			local pre_change = highway_ui.seq_page[i]
-			highway_ui.seq_page[i] = util.clamp(highway_ui.seq_page[i] + 1, 1, 8)
-			if pre_change ~= highway_ui.seq_page[i] then
-				sequence[i][j].ui_position = 1
+		elseif sequence[i][j].ui_position + d > 24 then
+			local pre_change = tracks_ui.seq_page[i]
+			tracks_ui.seq_page[i] = util.clamp(tracks_ui.seq_page[i] + 1, 1, 8)
+			if pre_change ~= tracks_ui.seq_page[i] then
+				sequence[i][tracks_ui.seq_page[i]].ui_position = 1
 			end
 		else
-			sequence[i][j].ui_position = util.clamp(sequence[i][j].ui_position + d, 1, 16)
+			sequence[i][j].ui_position = util.clamp(sequence[i][j].ui_position + d, 1, 24)
 		end
 	else
-		highway_ui.seq_page[i] = util.clamp(highway_ui.seq_page[i] + (d > 0 and 1 or -1), 1, 8)
+		tracks_ui.seq_page[i] = util.clamp(tracks_ui.seq_page[i] + (d > 0 and 1 or -1), 1, 8)
 	end
+	print("after", i, j, sequence[i][j].ui_position, tracks_ui.seq_page[i])
 end
 
 function check_for_menu_condition(i)
@@ -34,27 +36,27 @@ function enc_actions.parse(n, d)
 	if ui.control_set == "step parameters" then
 		_fkprm.enc(n, d)
 	else
-		-- local s_c = ui.screen_controls[ui.hill_focus][hills[ui.hill_focus].screen_focus]
-		local s_c = ui.screen_controls[ui.hill_focus][1]
-		local i = ui.hill_focus
+		-- local s_c = ui.screen_controls[ui.seq_focus][hills[ui.seq_focus].screen_focus]
+		local s_c = ui.screen_controls[ui.seq_focus][1]
+		local i = ui.seq_focus
 		-- local j = hills[i].screen_focus
-		local j = 1
+		local j = tracks_ui.seq_page[i]
 		local s_q = ui.seq_controls[i]
 		if n == 1 then
 			if ui.control_set == "play" then
-				ui.hill_focus = util.clamp(ui.hill_focus + d, 1, number_of_hills)
-				if ui.hill_focus < 8 then
+				ui.seq_focus = util.clamp(ui.seq_focus + d, 1, number_of_sequencers)
+				if ui.seq_focus < 8 then
 					if ui.menu_focus == 5 then
 						ui.menu_focus = 4
 					end
 				end
-        highway_ui.seq_page[ui.hill_focus] = math.ceil(sequence[ui.hill_focus][j].ui_position / 32)
+        tracks_ui.seq_page[ui.seq_focus] = math.ceil(sequence[ui.seq_focus][j].ui_position / 32)
 			elseif ui.control_set == "edit" then
 				if key1_hold then
 					enc_actions.delta_track_pos(i, j, d)
 				else
-					ui.hill_focus = util.clamp(ui.hill_focus + d, 1, number_of_hills)
-					if ui.hill_focus < 8 then
+					ui.seq_focus = util.clamp(ui.seq_focus + d, 1, number_of_sequencers)
+					if ui.seq_focus < 8 then
 						if ui.menu_focus == 5 then
 							ui.menu_focus = 4
 						end
@@ -66,29 +68,29 @@ function enc_actions.parse(n, d)
 				-- if params:string("hill " .. i .. " sample output") == "yes" then
 				-- 	ui.menu_focus = util.clamp(ui.menu_focus + d, 1, 5)
 				-- else
-				-- 	ui.menu_focus = util.clamp(ui.menu_focus + d, 1, ui.hill_focus <= 7 and 4 or 5)
+				-- 	ui.menu_focus = util.clamp(ui.menu_focus + d, 1, ui.seq_focus <= 7 and 4 or 5)
 				-- end
 				ui.menu_focus = util.clamp(ui.menu_focus + d, 1, 5)
 			elseif ui.control_set == "edit" then
         if ui.menu_focus == 1 then
           -- if key1_hold then
           if check_for_menu_condition(i) then
-            _s.popup_focus.tracks[i][1] = util.clamp(_s.popup_focus.tracks[i][1] + d, 1, 5)
+            ui.popup_focus.tracks[i][1] = util.clamp(ui.popup_focus.tracks[i][1] + d, 1, 5)
           else
             enc_actions.delta_track_pos(i, j, d)
           end
         elseif ui.menu_focus == 2 then
           if key1_hold then
-            _s.popup_focus.tracks[i][2] = util.clamp(_s.popup_focus.tracks[i][2] + d, 1, 4)
+            ui.popup_focus.tracks[i][2] = util.clamp(ui.popup_focus.tracks[i][2] + d, 1, 4)
           else
             s_c["bounds"]["focus"] = util.clamp(s_c["bounds"]["focus"] + d, 1, s_c["bounds"]["max"])
             for _hills = 1, 8 do
-              ui.screen_controls[ui.hill_focus][_hills]["bounds"]["focus"] = s_c["bounds"]["focus"]
+              ui.screen_controls[ui.seq_focus][_hills]["bounds"]["focus"] = s_c["bounds"]["focus"]
             end
           end
         elseif ui.menu_focus == 3 then
           if key1_hold then
-            _s.popup_focus.tracks[i][3] = util.clamp(_s.popup_focus.tracks[i][3] + d, 1, 2)
+            ui.popup_focus.tracks[i][3] = util.clamp(ui.popup_focus.tracks[i][3] + d, 1, 2)
           else
             enc_actions.delta_track_pos(i, j, d)
           end
@@ -110,41 +112,41 @@ function enc_actions.parse(n, d)
           if ui.control_set == "edit" then
             -- if key1_hold then
             if check_for_menu_condition(i) then
-              if _s.popup_focus.tracks[i][1] == 1 then
+              if ui.popup_focus.tracks[i][1] == 1 then
                 _hsteps.cycle_conditional(i, j, _pos, d)
-              elseif _s.popup_focus.tracks[i][1] == 2 then
+              elseif ui.popup_focus.tracks[i][1] == 2 then
                 _hsteps.cycle_prob(i, j, _pos, d)
-              elseif _s.popup_focus.tracks[i][1] == 3 then
+              elseif ui.popup_focus.tracks[i][1] == 3 then
                 _hsteps.cycle_retrig_count(i, j, _pos, d)
-              elseif _s.popup_focus.tracks[i][1] == 4 then
+              elseif ui.popup_focus.tracks[i][1] == 4 then
                 _hsteps.cycle_retrig_time(i, j, _pos, d)
-              elseif _s.popup_focus.tracks[i][1] == 5 then
+              elseif ui.popup_focus.tracks[i][1] == 5 then
                 _hsteps.cycle_retrig_vel(i, j, _pos, d)
               end
             else
-              local _active = sequence[i][j]
-              local _a = _active[highway_ui.seq_page[i]]
-              local focused_set = _active.focus == "main" and _a or _a.fill
+              local _active = sequence[i]
+              local _a = _active[tracks_ui.seq_page[i]]
+              local focused_set = _a.focus == "main" and _a or _a.fill
               if d > 0 then
                 if focused_set.trigs[_pos] == false then
-                  _htracks.change_trig_state(
+                  _tracks.change_trig_state(
                     focused_set,
                     _pos,
                     true,
                     i,
                     j,
-                    highway_ui.seq_page[i]
+                    tracks_ui.seq_page[i]
                   )
                 end
               else
                 if focused_set.trigs[_pos] == true then
-                  _htracks.change_trig_state(
+                  _tracks.change_trig_state(
                     focused_set,
                     _pos,
                     false,
                     i,
                     j,
-                    highway_ui.seq_page[i]
+                    tracks_ui.seq_page[i]
                   )
                 end
               end
@@ -152,15 +154,15 @@ function enc_actions.parse(n, d)
           elseif ui.control_set == "play" then
             -- CHANGE EDIT POSITION
             -- hills[i].screen_focus = util.clamp(j + d, 1, #sequence[i])
-            -- highway_ui.seq_page[i] = math.ceil(sequence[i][hills[i].screen_focus].ui_position/16)
+            -- tracks_ui.seq_page[i] = math.ceil(sequence[i][hills[i].screen_focus].ui_position/16)
           end
         elseif ui.menu_focus == 2 and ui.control_set == "edit" then
           if key1_hold then
-            if _s.popup_focus.tracks[i][2] == 1 then
+            if ui.popup_focus.tracks[i][2] == 1 then
               _hsteps.cycle_er_param("pulses", i, j, d)
-            elseif _s.popup_focus.tracks[i][2] == 2 then
+            elseif ui.popup_focus.tracks[i][2] == 2 then
               _hsteps.cycle_er_param("steps", i, j, d)
-            elseif _s.popup_focus.tracks[i][2] == 3 then
+            elseif ui.popup_focus.tracks[i][2] == 3 then
               _hsteps.cycle_er_param("shift", i, j, d)
             end
           else
@@ -175,12 +177,12 @@ function enc_actions.parse(n, d)
           end
         elseif ui.menu_focus == 3 and ui.control_set == "edit" then
           if key1_hold then
-            if _s.popup_focus.tracks[i][3] == 1 then
-            elseif _s.popup_focus.tracks[i][3] == 2 then
+            if ui.popup_focus.tracks[i][3] == 1 then
+            elseif ui.popup_focus.tracks[i][3] == 2 then
               _hsteps.cycle_chord_degrees(i, j, _pos, d)
             end
           else
-            _t.track_transpose(i, j, highway_ui.seq_page[i], sequence[i][j].ui_position, d)
+            _t.track_transpose(i, j, tracks_ui.seq_page[i], sequence[i][j].ui_position, d)
           end
         end
 			elseif ui.control_set == "seq" then

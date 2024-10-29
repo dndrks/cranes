@@ -29,17 +29,20 @@
 -- change buffer 2's reference
 -- \\\\
 
+show_me_steps = true
 frm = require("formatters")
 engine.name = "CheatCranes"
 
 CheatCranes = include 'lib/engine_init'
 _ca = include 'lib/clip'
-include 'lib/grid'
 _step = include 'lib/step'
 _tracks = include("lib/tracks")
+_fkprm = include("lib/fkprm")
 _tUi = include("lib/tracks_ui")
 _tEnc = include("lib/tracks_enc")
+_tKey = include("lib/tracks_key")
 _sequins = require 'sequins'
+include("lib/grid")
 
 function r()
 	norns.rerun()
@@ -135,11 +138,13 @@ function init_voices()
 end
 
 function init()
+
 	g = grid.connect()
 
 	CheatCranes.init(3, true)
 	_ca.init(3)
 	_step.init()
+	_fkprm.init()
 
 	audio.level_adc_cut(1)
 	audio.level_eng_cut(0)
@@ -150,16 +155,26 @@ function init()
 
 	init_voices()
 
+	key2_hold_counter = metro.init()
+	key2_hold_counter.time = 0.25
+	key2_hold_counter.count = 1
+	key2_hold_counter.event = function()
+		key2_hold = true
+		hardware_dirty = true
+	end
+
 	params:add_separator('sequencer')
 	for i = 1,8 do
-		_tracks.init(i,1)
+		for j = 1,8 do
+			_tracks.init(i,j)
+		end
 		params:add_option("iterator_"..i, "iterator", { "norns", "external MIDI clock", "external MIDI note" }, 1)
 		params:set_action("iterator_"..i, function(x)
 			if x == 1 then
 				if not clock.threads[sequence[i].clock] then
-					local _page = sequence[i][sequence[i].active_hill].page
-					sequence[i][sequence[i].active_hill][_page].micro[0] = sequence[i][sequence[i].active_hill][_page].micro[1]
-					_tracks.start_playback(i, sequence[i].active_hill)
+					local _page = sequence[i].page
+					sequence[i][_page].micro[0] = sequence[i][_page].micro[1]
+					_tracks.start_playback(i, _page)
 					sequence[i].clock = clock.run(_tracks.iterate, i)
 				end
 				-- params:hide("hill_" .. i .. "_iterator_midi_device")
@@ -387,7 +402,7 @@ function init()
 
 	hardware_redraw = metro.init(function()
 		draw_hardware()
-	end, 1 / 30, -1)
+	end, 1 / 60, -1)
 	hardware_redraw:start()
 
 	hardware_dirty = true
@@ -631,59 +646,63 @@ end
 
 -- key hardware interaction
 function key(n, z)
-	-- KEY 2
-	if n == 2 and z == 1 then
-		record()
-	end
-
-	-- KEY 3
-	-- all based on Parameter choice
-	if n == 3 then
-		if z == 1 then
-			KEY3_hold = true
-			if KEY3 == 1 then
-				warble()
-			elseif KEY3 == 2 then
-				half_speed()
-			elseif KEY3 == 3 then
-				rev_speed()
-			elseif KEY3 == 4 then
-				oneandahalf_speed()
-			elseif KEY3 == 5 then
-				double_speed()
-			end
-		elseif z == 0 then
-			KEY3_hold = false
-			restore_speed()
+	if not show_me_steps then
+		-- KEY 2
+		if n == 2 and z == 1 then
+			record()
 		end
-		softcut.rate(1, wiggle * semitone_offset)
-	end
 
-	-- KEY 1
-	-- hold key 1 + key 3 to clear the buffers
-	if n == 1 and z == 1 and KEY3_hold == true then
-		clear_all()
-		KEY1_hold = false
-	elseif n == 1 and z == 1 then
-		KEY1_press = KEY1_press + 1
-		if recording == true then
-			recording = false
-			if KEY1_press % 2 == 1 then
-				softcut.rec_level(1, 0)
-				softcut.pre_level(1, 1)
-			elseif KEY1_press % 2 == 0 then
-				softcut.rec_level(2, 0)
-				softcut.pre_level(2, 1)
+		-- KEY 3
+		-- all based on Parameter choice
+		if n == 3 then
+			if z == 1 then
+				KEY3_hold = true
+				if KEY3 == 1 then
+					warble()
+				elseif KEY3 == 2 then
+					half_speed()
+				elseif KEY3 == 3 then
+					rev_speed()
+				elseif KEY3 == 4 then
+					oneandahalf_speed()
+				elseif KEY3 == 5 then
+					double_speed()
+				end
+			elseif z == 0 then
+				KEY3_hold = false
+				restore_speed()
 			end
-			crane_redraw[1] = 0
-			crane_redraw[2] = 0
+			softcut.rate(1, wiggle * semitone_offset)
+		end
+
+		-- KEY 1
+		-- hold key 1 + key 3 to clear the buffers
+		if n == 1 and z == 1 and KEY3_hold == true then
+			clear_all()
+			KEY1_hold = false
+		elseif n == 1 and z == 1 then
+			KEY1_press = KEY1_press + 1
+			if recording == true then
+				recording = false
+				if KEY1_press % 2 == 1 then
+					softcut.rec_level(1, 0)
+					softcut.pre_level(1, 1)
+				elseif KEY1_press % 2 == 0 then
+					softcut.rec_level(2, 0)
+					softcut.pre_level(2, 1)
+				end
+				crane_redraw[1] = 0
+				crane_redraw[2] = 0
+				screen_dirty = true
+			end
+			KEY1_hold = true
+			screen_dirty = true
+		elseif n == 1 and z == 0 then
+			KEY1_hold = false
 			screen_dirty = true
 		end
-		KEY1_hold = true
-		screen_dirty = true
-	elseif n == 1 and z == 0 then
-		KEY1_hold = false
-		screen_dirty = true
+	else
+		_tKey.parse(n,z)
 	end
 end
 

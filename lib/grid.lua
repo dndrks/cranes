@@ -3,12 +3,21 @@
 -- hardware: grid connect
 g = grid.connect()
 
+grid_conditional_entry = false
+conditional_entry_steps = { ["focus"] = {}, ["held"] = {} }
+for i = 1, number_of_sequencers do
+	conditional_entry_steps.focus[i] = {}
+	conditional_entry_steps.held[i] = 0
+end
+
 -- hardware: grid event (eg 'what happens when a button is pressed')
 g.key = function(x, y, z)
 	-- speed + direction
 	if y <= 8 then
     parse_cranes(x,y,z)
-	elseif y > 8 then
+	elseif y >= 8 and y <= 12 then
+		_tUi.parse_grid(x, y, z)
+	elseif y >= 13 then
     parse_cheat(x,y,z)
   end
 	hardware_dirty = true
@@ -101,7 +110,7 @@ function grid_redraw()
 	draw_cheat(1, 13)
 	draw_cheat(7, 13)
 	draw_cheat(13, 13)
-	_step.draw_grid(1)
+	_tUi.draw_grid(1)
 	g:refresh()
 end
 

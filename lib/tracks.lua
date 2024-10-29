@@ -1,6 +1,7 @@
 local track_actions = {}
 
 sequence = {}
+number_of_sequencers = 3
 
 track_paste_style = 1
 
@@ -63,9 +64,9 @@ local track_retrig_lookup = {
 	64,
 }
 
-local function build_params(target, seq, page_number, i)
+local function build_params(target, page_number, i)
 	track_paramset:add_option(
-		"track_retrig_time_" .. target .. "_" .. seq .. "_" .. page_number .. "_" .. i,
+		"track_retrig_time_" .. target ..  "_" .. page_number .. "_" .. i,
 		"",
 		{
 			"1/64",
@@ -109,14 +110,14 @@ local function build_params(target, seq, page_number, i)
 		13
 	)
 	track_paramset:set_action(
-		"track_retrig_time_" .. target .. "_" .. seq .. "_" .. page_number .. "_" .. i,
+		"track_retrig_time_" .. target .. "_" .. page_number .. "_" .. i,
 		function(x)
 			sequence[target][seq][page_number].conditional.retrig_time[i] = track_retrig_lookup[x]
 		end
 	)
 
 	track_paramset:add_option(
-		"track_fill_retrig_time_" .. target .. "_" .. seq .. "_" .. page_number .. "_" .. i,
+		"track_fill_retrig_time_" .. target .. "_" .. page_number .. "_" .. i,
 		"",
 		{
 			"1/64",
@@ -160,185 +161,178 @@ local function build_params(target, seq, page_number, i)
 		13
 	)
 	track_paramset:set_action(
-		"track_fill_retrig_time_" .. target .. "_" .. seq .. "_" .. page_number .. "_" .. i,
+		"track_fill_retrig_time_" .. target .. "_" .. page_number .. "_" .. i,
 		function(x)
 			sequence[target][seq][page_number].fill.conditional.retrig_time[i] = track_retrig_lookup[x]
 		end
 	)
 end
 
-function track_actions.init(target, seq, clear_reset)
-	print("begin initialize sequence: " .. target .. ", " .. util.time())
+function track_actions.init(target, page, clear_reset)
+	-- print("begin initialize sequence: " .. target .. ", " .. util.time())
 	local build_clock = false
 	local pre_clear_step
-	if clear_reset and sequence[target].active_hill == seq then
-		pre_clear_step = sequence[target][seq].step
+	if clear_reset and sequence[target].page == page then
+		pre_clear_step = sequence[target][page].step -- TODO: figure this out 241028
 	end
 	if sequence[target] == nil then
 		sequence[target] = {}
 		sequence[target].scale = { source = {}, index = 1 }
-		sequence[target].active_hill = 1
 		-- sequence[target].song_mute = {}
 		sequence[target].external_prm_change = {}
 		sequence[target].rec = false
 		sequence[target].rec_note_entry = false
 		sequence[target].manual_note_entry = false
 		sequence[target].mute_during_note_entry = false
-		-- build_clock = true
-	end
-
-	sequence[target][seq] = {}
-	sequence[target][seq].playing = false
-	sequence[target][seq].time = 1 / 4
-	if not clear_reset or (clear_reset and sequence[target].active_hill ~= seq) then
-		sequence[target][seq].step = 1
-	elseif clear_reset and sequence[target].active_hill == seq then
-		sequence[target][seq].step = pre_clear_step
-	end
-	sequence[target][seq].ui_position = 1
-	sequence[target][seq].page = 1
-	sequence[target][seq].page_active = {
-		true,
-		false,
-		false,
-		false,
-		false,
-		false,
-		false,
-		false,
-	}
-	sequence[target][seq].page_probability = {
-		100,
-		100,
-		100,
-		100,
-		100,
-		100,
-		100,
-		100,
-	}
-	sequence[target][seq].swing = 50
-	sequence[target][seq].mode = "fwd"
-	sequence[target][seq].loop = true
-	sequence[target][seq].focus = "main"
-	sequence[target][seq].page_chain = _sequins({ 1 })
-
-	for pages = 1, 8 do
-		sequence[target][seq][pages] = {}
-		sequence[target][seq][pages].base_note = {}
-		sequence[target][seq][pages].seed_default_note = {}
-		sequence[target][seq][pages].chord_degrees = {}
-		sequence[target][seq][pages].octave_offset = {}
-		sequence[target][seq][pages].velocities = {}
-		sequence[target][seq][pages].trigs = {}
-		sequence[target][seq][pages].muted_trigs = {}
-		sequence[target][seq][pages].accented_trigs = {}
-		sequence[target][seq][pages].legato_trigs = {}
-		sequence[target][seq][pages].lock_trigs = {}
-		sequence[target][seq][pages].prob = {}
-		sequence[target][seq][pages].micro = {}
-		sequence[target][seq][pages].er = { pulses = 0, steps = 16, shift = 0 }
-		sequence[target][seq][pages].last_condition = false
-		sequence[target][seq][pages].conditional = {}
-		sequence[target][seq][pages].conditional.cycle = 1
-		sequence[target][seq][pages].conditional.A = {}
-		sequence[target][seq][pages].conditional.B = {}
-		sequence[target][seq][pages].conditional.mode = {}
-		sequence[target][seq][pages].conditional.retrig_clock = nil
-		sequence[target][seq][pages].conditional.retrig_count = {}
-		sequence[target][seq][pages].conditional.retrig_time = {}
-		sequence[target][seq][pages].conditional.retrig_slope = {}
-		-- sequence[target][seq][pages].focus = "main"
-		sequence[target][seq][pages].fill = {
-			["base_note"] = {},
-			["seed_default_note"] = {},
-			["chord_degrees"] = {},
-			["octave_offset"] = {},
-			["velocities"] = {},
-			["trigs"] = {},
-			["muted_trigs"] = {},
-			["accented_trigs"] = {},
-			["legato_trigs"] = {},
-			["lock_trigs"] = {},
-			["prob"] = {},
-			["er"] = { pulses = 0, steps = 16, shift = 0 },
-			["conditional"] = {
-				["A"] = {},
-				["B"] = {},
-				["mode"] = {},
-				["retrig_count"] = {},
-				["retrig_time"] = {},
-				["retrig_slope"] = {},
-			},
+		sequence[target].page = 1
+		sequence[target].page_active = {
+			true,
+			false,
+			false,
+			false,
+			false,
+			false,
+			false,
+			false,
 		}
-		for i = 1, 24 do
-			sequence[target][seq][pages].start_point = 1
-			sequence[target][seq][pages].end_point = 24
-
-			sequence[target][seq][pages].base_note[i] = -1
-			sequence[target][seq][pages].seed_default_note[i] = true
-			sequence[target][seq][pages].chord_degrees[i] = 1
-			sequence[target][seq][pages].octave_offset[i] = 0
-			sequence[target][seq][pages].velocities[i] = 127
-			sequence[target][seq][pages].trigs[i] = false
-			sequence[target][seq][pages].muted_trigs[i] = false
-			sequence[target][seq][pages].accented_trigs[i] = false
-			sequence[target][seq][pages].legato_trigs[i] = false
-			sequence[target][seq][pages].lock_trigs[i] = false
-			sequence[target][seq][pages].prob[i] = 100
-			sequence[target][seq][pages].conditional.A[i] = 1
-			sequence[target][seq][pages].conditional.B[i] = 1
-			sequence[target][seq][pages].conditional.mode[i] = "A:B"
-			sequence[target][seq][pages].conditional.retrig_count[i] = 0
-			sequence[target][seq][pages].micro[i] = 0
-			if not clear_reset then
-				build_params(target, seq, pages, i)
-			end
-			sequence[target][seq][pages].conditional.retrig_time[i] = track_retrig_lookup[track_paramset:get(
-				"track_retrig_time_" .. target .. "_" .. seq .. "_" .. pages .. "_" .. i
-			)]
-			sequence[target][seq][pages].conditional.retrig_slope[i] = 0
-
-			sequence[target][seq][pages].fill.base_note[i] = -1
-			sequence[target][seq][pages].fill.seed_default_note[i] = true
-			sequence[target][seq][pages].fill.chord_degrees[i] = 1
-			sequence[target][seq][pages].fill.octave_offset[i] = 0
-			sequence[target][seq][pages].fill.velocities[i] = 127
-			sequence[target][seq][pages].fill.trigs[i] = false
-			sequence[target][seq][pages].fill.muted_trigs[i] = false
-			sequence[target][seq][pages].fill.accented_trigs[i] = false
-			sequence[target][seq][pages].fill.legato_trigs[i] = false
-			sequence[target][seq][pages].fill.lock_trigs[i] = false
-			sequence[target][seq][pages].fill.prob[i] = 100
-			sequence[target][seq][pages].fill.conditional.A[i] = 1
-			sequence[target][seq][pages].fill.conditional.B[i] = 1
-			sequence[target][seq][pages].fill.conditional.mode[i] = "A:B"
-			sequence[target][seq][pages].fill.conditional.retrig_count[i] = 0
-			sequence[target][seq][pages].fill.conditional.retrig_time[i] = track_retrig_lookup[track_paramset:get(
-				"track_fill_retrig_time_" .. target .. "_" .. seq .. "_" .. pages .. "_" .. i
-			)]
-			sequence[target][seq][pages].fill.conditional.retrig_slope[i] = 0
-		end
+		sequence[target].page_probability = {
+			100,
+			100,
+			100,
+			100,
+			100,
+			100,
+			100,
+			100,
+		}
+		sequence[target].page_chain = _sequins({ 1, 2})
 	end
+
+	sequence[target][page] = {}
+	sequence[target][page].playing = false
+	sequence[target][page].time = 1 / 4
+	if not clear_reset or (clear_reset and sequence[target].page ~= page) then
+		sequence[target][page].step = 1
+	elseif clear_reset and sequence[target].page == page then
+		sequence[target][page].step = pre_clear_step
+	end
+	sequence[target][page].ui_position = 1
+	sequence[target][page].swing = 50
+	sequence[target][page].mode = "fwd"
+	sequence[target][page].loop = true
+	sequence[target][page].focus = "main"
+  sequence[target][page].base_note = {}
+  sequence[target][page].seed_default_note = {}
+  sequence[target][page].chord_degrees = {}
+  sequence[target][page].octave_offset = {}
+  sequence[target][page].velocities = {}
+  sequence[target][page].trigs = {}
+  sequence[target][page].muted_trigs = {}
+  sequence[target][page].accented_trigs = {}
+  sequence[target][page].legato_trigs = {}
+  sequence[target][page].lock_trigs = {}
+  sequence[target][page].prob = {}
+  sequence[target][page].micro = {}
+  sequence[target][page].er = { pulses = 0, steps = 16, shift = 0 }
+  sequence[target][page].last_condition = false
+  sequence[target][page].conditional = {}
+  sequence[target][page].conditional.cycle = 1
+  sequence[target][page].conditional.A = {}
+  sequence[target][page].conditional.B = {}
+  sequence[target][page].conditional.mode = {}
+  sequence[target][page].conditional.retrig_clock = nil
+  sequence[target][page].conditional.retrig_count = {}
+  sequence[target][page].conditional.retrig_time = {}
+  sequence[target][page].conditional.retrig_slope = {}
+		-- sequence[target][seq][pages].focus = "main"
+  sequence[target][page].fill = {
+    ["base_note"] = {},
+    ["seed_default_note"] = {},
+    ["chord_degrees"] = {},
+    ["octave_offset"] = {},
+    ["velocities"] = {},
+    ["trigs"] = {},
+    ["muted_trigs"] = {},
+    ["accented_trigs"] = {},
+    ["legato_trigs"] = {},
+    ["lock_trigs"] = {},
+    ["prob"] = {},
+    ["er"] = { pulses = 0, steps = 16, shift = 0 },
+    ["conditional"] = {
+      ["A"] = {},
+      ["B"] = {},
+      ["mode"] = {},
+      ["retrig_count"] = {},
+      ["retrig_time"] = {},
+      ["retrig_slope"] = {},
+    },
+  }
+  sequence[target][page].start_point = 1
+  sequence[target][page].end_point = 24
+		
+  for i = 1, 24 do
+    sequence[target][page].base_note[i] = -1
+    sequence[target][page].seed_default_note[i] = true
+    sequence[target][page].chord_degrees[i] = 1
+    sequence[target][page].octave_offset[i] = 0
+    sequence[target][page].velocities[i] = 127
+    sequence[target][page].trigs[i] = false
+    sequence[target][page].muted_trigs[i] = false
+    sequence[target][page].accented_trigs[i] = false
+    sequence[target][page].legato_trigs[i] = false
+    sequence[target][page].lock_trigs[i] = false
+    sequence[target][page].prob[i] = 100
+    sequence[target][page].conditional.A[i] = 1
+    sequence[target][page].conditional.B[i] = 1
+    sequence[target][page].conditional.mode[i] = "A:B"
+    sequence[target][page].conditional.retrig_count[i] = 0
+    sequence[target][page].micro[i] = 0
+    if not clear_reset then
+      build_params(target, page, i)
+    end
+    sequence[target][page].conditional.retrig_time[i] = track_retrig_lookup[track_paramset:get(
+      "track_retrig_time_" .. target .. "_" .. page .. "_" .. i
+    )]
+    sequence[target][page].conditional.retrig_slope[i] = 0
+
+    sequence[target][page].fill.base_note[i] = -1
+    sequence[target][page].fill.seed_default_note[i] = true
+    sequence[target][page].fill.chord_degrees[i] = 1
+    sequence[target][page].fill.octave_offset[i] = 0
+    sequence[target][page].fill.velocities[i] = 127
+    sequence[target][page].fill.trigs[i] = false
+    sequence[target][page].fill.muted_trigs[i] = false
+    sequence[target][page].fill.accented_trigs[i] = false
+    sequence[target][page].fill.legato_trigs[i] = false
+    sequence[target][page].fill.lock_trigs[i] = false
+    sequence[target][page].fill.prob[i] = 100
+    sequence[target][page].fill.conditional.A[i] = 1
+    sequence[target][page].fill.conditional.B[i] = 1
+    sequence[target][page].fill.conditional.mode[i] = "A:B"
+    sequence[target][page].fill.conditional.retrig_count[i] = 0
+    sequence[target][page].fill.conditional.retrig_time[i] = track_retrig_lookup[track_paramset:get(
+      "track_fill_retrig_time_" .. target .. "_" .. page .. "_" .. i
+    )]
+    sequence[target][page].fill.conditional.retrig_slope[i] = 0
+  end
 
 	if build_clock then
 		sequence[target].clock = clock.run(track_actions.iterate, target)
 	end
 
-	print("initializing sequence: " .. target .. ", " .. util.time())
+	-- print("initializing sequence: " .. target .. ", " .. util.time())
 end
 
 function track_actions.change_pattern(i, j, source)
 	track_actions.stop_playback(i)
 	if source ~= "from pattern" then
-		sequence[i].active_hill = j
+		sequence[i].page = j
 	end
 	track_actions.start_playback(i, j)
 end
 
-function track_actions.check_page_probability(n, i, j)
-	local _page = sequence[i][j].page
-	if math.random(1, 100) <= sequence[i][j].page_probability[n] then
+function track_actions.check_page_probability(n, i)
+	if math.random(1, 100) <= sequence[i].page_probability[n] then
 		-- if i == 1 then
 		--   print("page "..n)
 		-- end
@@ -347,42 +341,35 @@ function track_actions.check_page_probability(n, i, j)
 		if i == 1 then
 			print("skip page " .. n)
 		end
-		return sequence[i][j].page_chain()
+		return sequence[i].page_chain()
 	end
 end
 
-function track_actions.change_page_probability(i, j, n, d)
-	sequence[i][j].page_probability[n] = util.clamp(sequence[i][j].page_probability[n] + d, 1, 100)
-	sequence[i][j].page_chain:map(track_actions.check_page_probability, i, j)
+function track_actions.change_page_probability(i, n, d)
+	sequence[i].page_probability[n] = util.clamp(sequence[i].page_probability[n] + d, 1, 100)
+	sequence[i].page_chain:map(track_actions.check_page_probability, i)
 end
 
 function track_actions.start_playback(i, j)
-	local _page
-	-- for p = 1,8 do
-	--   if sequence[i][j].page_active[p] then
-	--     _page = p
-	--     break
-	--   end
-	-- end
-	sequence[i][j].page_chain:map(track_actions.check_page_probability, i, j)
-	sequence[i][j].page_chain:reset()
-	_page = sequence[i][j].page_chain()
-	sequence[i][j][_page].micro[0] = sequence[i][j][_page].micro[1]
+	sequence[i].page_chain:map(track_actions.check_page_probability, i)
+	sequence[i].page_chain:reset()
+	local _page = sequence[i].page_chain()
+	sequence[i][_page].micro[0] = sequence[i][_page].micro[1]
 	local track_start = {
-		["fwd"] = sequence[i][j][_page].start_point - 1,
-		["bkwd"] = sequence[i][j][_page].end_point + 1,
-		["pend"] = sequence[i][j][_page].start_point,
-		["rnd"] = sequence[i][j][_page].start_point - 1,
+		["fwd"] = sequence[i][_page].start_point - 1,
+		["bkwd"] = sequence[i][_page].end_point + 1,
+		["pend"] = sequence[i][_page].start_point,
+		["rnd"] = sequence[i][_page].start_point - 1,
 	}
-	sequence[i][j].step = track_start[sequence[i][j].mode]
-	sequence[i][j].playing = true
-	if sequence[i][j].mode == "pend" then
+	sequence[i].step = track_start[sequence[i].mode] -- TODO: 241028: what does this do? there's no step at this layer...
+	sequence[i].playing = true
+	if sequence[i].mode == "pend" then
 		track_direction[i] = "negative"
 	end
 end
 
 function track_actions.stop_playback(i)
-	local j = sequence[i].active_hill
+	local j = sequence[i].page
 	local _page = sequence[i][j].page
 	if clock.threads[sequence[i].clock] then
 		clock.cancel(sequence[i].clock)
@@ -407,27 +394,27 @@ end
 
 function track_actions.sync_playheads()
 	for i = 1, 8 do
-		sequence[i][sequence[i].active_hill].step = sequence[i][sequence[i].active_hill][1].start_point
+		sequence[i][sequence[i].page].step = sequence[i][sequence[i].page][1].start_point
 	end
 end
 
 function track_actions.jump_page(target, new_page, restart)
-	sequence[target][sequence[target].active_hill].page = new_page
+	sequence[target][sequence[target].page].page = new_page
 	if restart == true then
-		sequence[target][sequence[target].active_hill].step = sequence[target][sequence[target].active_hill][new_page].start_point
+		sequence[target][sequence[target].page].step = sequence[target][sequence[target].page][new_page].start_point
 	end
 end
 
 function track_actions.iterate(target)
 	while true do
-		local i, j = target, sequence[target].active_hill
 		track_actions.tick(target)
-		clock.sync(sequence[i][j].time, sequence[i][j][sequence[i][j].page].micro[sequence[i][j].step] / 384)
+		local i, j = target, sequence[target].page
+		clock.sync(sequence[i][j].time, sequence[i][j].micro[sequence[i][j].step] / 384)
 	end
 end
 
 function track_actions.tick(target)
-	local _active = sequence[target][sequence[target].active_hill]
+	local _active = sequence[target][sequence[target].page]
 	local _a = _active[_active.page]
 	if not _active.loop then
 		if _active.step == _a.end_point then
@@ -450,13 +437,13 @@ function track_actions.tick(target)
 		end
 		_active.playing = true
 	end
-	grid_dirty = true
+	hardware_dirty = true
 	-- end
 end
 
 -- 230520 TODO: evaluate necessity of these (probably would be cool tho!):
 -- function track_actions.prob_fill(target,s_p,e_p,value)
---   local _active = sequence[target][sequence[target].active_hill]
+--   local _active = sequence[target][sequence[target].page]
 --   local focused_set = _active.focus == "main" and _active or _active.fill
 --   for i = s_p,e_p do
 --     focused_set.prob[i] = value
@@ -464,7 +451,7 @@ end
 -- end
 
 -- function track_actions.cond_fill(target,s_p,e_p,a_val,b_val) -- TODO: gets weird...
---   local _active = sequence[target][sequence[target].active_hill]
+--   local _active = sequence[target][sequence[target].page]
 --   local focused_set = _active.focus == "main" and _active or _active.fill
 --   if b_val ~= "meta" then
 --     for i = s_p,e_p do
@@ -480,7 +467,7 @@ end
 -- end
 
 -- function track_actions.retrig_fill(target,s_p,e_p,val,type)
---   local _active = sequence[target][sequence[target].active_hill]
+--   local _active = sequence[target][sequence[target].page]
 --   local focused_set = _active.focus == "main" and _active or _active.fill
 --   if type == "retrig_count" then
 --     for i = s_p,e_p do
@@ -488,13 +475,13 @@ end
 --     end
 --   else
 --     for i = s_p,e_p do
---       track_paramset:set((_active.focus == "main" and "track_retrig_time_" or "track_fill_retrig_time_")..target.."_"..sequence[target].active_hill..'_'..i,val)
+--       track_paramset:set((_active.focus == "main" and "track_retrig_time_" or "track_fill_retrig_time_")..target.."_"..sequence[target].page..'_'..i,val)
 --     end
 --   end
 -- end
 
 function track_actions.change_trig_state(target_track, target_step, state, i, j, _page)
-	-- print('change_trig_state:',target_track,target_step,state, _page)
+	print('change_trig_state:',target_track,target_step,state, _page)
 	target_track.trigs[target_step] = state
 	if state == true then
 		if tab.count(_fkprm.adjusted_params_lock_trigs[i][j][_page][target_step].params) > 0 then
@@ -505,27 +492,33 @@ function track_actions.change_trig_state(target_track, target_step, state, i, j,
 end
 
 function track_actions.process(target)
-	local _active = sequence[target][sequence[target].active_hill]
+	local _active = sequence[target][sequence[target].page]
 	-- TODO: drunk walk!
 	track_actions[_active.mode](target)
+	_active = sequence[target][sequence[target].page]
+  -- if target == 1 then print('>>> '.._active.step) end
 	screen_dirty = true
 	track_actions.run(target, _active.step)
 end
 
 function track_actions.fwd(target)
-	local _active = sequence[target][sequence[target].active_hill]
+	local _active = sequence[target]
 	local _a = _active[_active.page]
-	_active.step = _active.step + 1
-	if _active.step > _a.end_point then
+	_a.step = _a.step + 1
+	if _a.step > _a.end_point then
 		_active.page = _active.page_chain()
+    if ui.control_set ~= 'edit' then
+      tracks_ui.seq_page[target] = _active.page
+    end
 		_a = _active[_active.page]
-		_active.step = _a.start_point
+		_a.step = _a.start_point
 		_a.conditional.cycle = _a.conditional.cycle + 1
 	end
+	-- if target == 1 then print(_active.page, _a.step) end
 end
 
 function track_actions.bkwd(target)
-	local _active = sequence[target][sequence[target].active_hill]
+	local _active = sequence[target][sequence[target].page]
 	local _a = _active[_active.page]
 	_active.step = wrap(_active.step - 1, _a.start_point, _a.end_point)
 	if _active.step == _a.end_point then
@@ -534,7 +527,7 @@ function track_actions.bkwd(target)
 end
 
 function track_actions.rnd(target)
-	local _active = sequence[target][sequence[target].active_hill]
+	local _active = sequence[target][sequence[target].page]
 	local _a = _active[_active.page]
 	_active.step = math.random(_a.start_point, _a.end_point)
 	if _active.step == _a.start_point or _active.step == _a.end_point then
@@ -543,12 +536,12 @@ function track_actions.rnd(target)
 end
 
 function track_actions.generate_er(i, j, _page)
-	local _active = sequence[i][j]
+	local _active = sequence[i]
 	local _a = _active[_page]
-	local focused_set = _active.focus == "main" and _a or _a.fill
+	local focused_set = _a.focus == "main" and _a or _a.fill
 	local generated = euclid.gen(focused_set.er.pulses, focused_set.er.steps, focused_set.er.shift)
 	for length = focused_set.start_point, focused_set.end_point do
-		_htracks.change_trig_state(focused_set, length, generated[length - (focused_set.start_point - 1)], i, j, _page)
+		_tracks.change_trig_state(focused_set, length, generated[length - (focused_set.start_point - 1)], i, j, _page)
 	end
 end
 
@@ -559,7 +552,7 @@ for i = 1, 8 do
 end
 
 function track_actions.pend(target)
-	local _active = sequence[target][sequence[target].active_hill]
+	local _active = sequence[target][sequence[target].page]
 	local _a = _active[_active.page]
 	if track_direction[target] == "positive" then
 		_active.step = _active.step + 1
@@ -580,9 +573,9 @@ function track_actions.pend(target)
 end
 
 function track_actions.check_prob(target, step)
-	local _active = sequence[target][sequence[target].active_hill]
+	local _active = sequence[target]
 	local _a = _active[_active.page]
-	local _f = _active.focus == "main" and _a.prob[step] or _a.fill.prob[step]
+	local _f = _a.focus == "main" and _a.prob[step] or _a.fill.prob[step]
 	if _f == 0 then
 		return false
 	elseif _f >= math.random(1, 100) then
@@ -593,11 +586,12 @@ function track_actions.check_prob(target, step)
 end
 
 function track_actions.run(target, step)
-	local _active = sequence[target][sequence[target].active_hill]
+	local _active = sequence[target]
 	local _a = _active[_active.page]
+  -- if target == 1 then print(_active.page, step) end
 	if
 		(
-			_active.focus == "main"
+			_a.focus == "main"
 			and (_a.trigs[step] == true or _a.lock_trigs[step] == true or _a.legato_trigs[step] == true)
 		)
 		or (
@@ -607,8 +601,8 @@ function track_actions.run(target, step)
 	then
 		local should_happen = track_actions.check_prob(target, step)
 		if should_happen then
-			local A_step = _active.focus == "main" and _a.conditional.A[step] or _a.fill.conditional.A[step]
-			local B_step = _active.focus == "main" and _a.conditional.B[step] or _a.fill.conditional.B[step]
+			local A_step = _a.focus == "main" and _a.conditional.A[step] or _a.fill.conditional.A[step]
+			local B_step = _a.focus == "main" and _a.conditional.B[step] or _a.fill.conditional.B[step]
 
 			if _a.conditional.mode[step] == "A:B" then
 				if _a.conditional.cycle < A_step then
@@ -644,14 +638,14 @@ function track_actions.run(target, step)
 				end
 			elseif _a.conditional.mode[step] == "NEI" then
 				local neighbors = { 10, 1, 2, 3, 4, 5, 6, 7, 8, 9 }
-				if sequence[neighbors[target]][sequence[target].active_hill].last_condition then
+				if sequence[neighbors[target]][sequence[target].page].last_condition then
 					track_actions.execute_step(target, step)
 				else
 					_a.last_condition = false
 				end
 			elseif _a.conditional.mode[step] == "NOT NEI" then
 				local neighbors = { 10, 1, 2, 3, 4, 5, 6, 7, 8, 9 }
-				if sequence[neighbors[target]][sequence[target].active_hill].last_condition then
+				if sequence[neighbors[target]][sequence[target].page].last_condition then
 					_a.last_condition = false
 				else
 					track_actions.execute_step(target, step)
@@ -664,12 +658,12 @@ function track_actions.run(target, step)
 end
 
 function track_actions.execute_step(target, step)
-	local _active = sequence[target][sequence[target].active_hill]
+	local _active = sequence[target]
 	local _a = _active[_active.page]
 	local focused_trigs = {}
 	local focused_notes = {}
 	local focused_legato = {}
-	if _active.focus == "main" then
+	if _a.focus == "main" then
 		focused_trigs = _a.trigs[step]
 		focused_notes = _a.base_note[step]
 		focused_legato = _a.legato_trigs[step]
@@ -678,17 +672,18 @@ function track_actions.execute_step(target, step)
 		focused_notes = _a.fill.base_note[step]
 		focused_legato = _a.fill.legato_trigs[step]
 	end
-	local i, j = target, sequence[target].active_hill
-	local note_check
-	note_check = hills_base_note[i]
-	pass_note(
-		i,
-		j,
-		hills[i][j], -- seg
-		focused_notes == -1 and note_check or focused_notes, -- note_val
-		step, -- index
-		0 -- retrig_index
-	)
+  print('step executed at '..step, clock.get_beats())
+	-- local i, j = target, sequence[target].page
+	-- local note_check
+	-- note_check = hills_base_note[i]
+	-- pass_note(
+	-- 	i,
+	-- 	j,
+	-- 	hills[i][j], -- seg
+	-- 	focused_notes == -1 and note_check or focused_notes, -- note_val
+	-- 	step, -- index
+	-- 	0 -- retrig_index
+	-- )
 	-- TODO: should these be focuseD???
 	if _a.trigs[step] then
 		track_actions.retrig_step(target, step)
@@ -697,14 +692,14 @@ function track_actions.execute_step(target, step)
 end
 
 function track_actions.retrig_step(target, step)
-	local _active = sequence[target][sequence[target].active_hill]
+	local _active = sequence[target]
 	local _a = _active[_active.page]
 	if _a.conditional.retrig_clock ~= nil then
 		clock.cancel(_a.conditional.retrig_clock)
 		_a.conditional.retrig_clock = nil
 	end
 	local focused_set, focused_notes = {}, {}
-	if _active.focus == "main" then
+	if _a.focus == "main" then
 		focused_set = _a.conditional
 		focused_notes = _a.base_note
 	else
@@ -714,7 +709,7 @@ function track_actions.retrig_step(target, step)
 	if focused_set.retrig_count[step] > 0 then
 		local base_time = (clock.get_beat_sec() * _active.time)
 		local swung_time = base_time * util.linlin(50, 100, 0, 1, _active.swing)
-		local i, j = target, sequence[target].active_hill
+		local i, j = target, sequence[target].page
 		_a.conditional.retrig_clock = clock.run(function()
 			for retrigs = 1, focused_set.retrig_count[step] do
 				clock.sleep(((clock.get_beat_sec() * _active.time) * focused_set.retrig_time[step]) + swung_time)
@@ -738,9 +733,9 @@ function track_actions.clear(target, seq)
 end
 
 function track_actions.reset_note_to_default(i, j)
-	local _active = sequence[i][j]
+	local _active = sequence[i]
 	local _a = _active[_active.page]
-	local focused_set = _active.focus == "main" and _a or _a.fill
+	local focused_set = _a.focus == "main" and _a or _a.fill
 	local note_check
 	note_check = hills_base_note[i]
 	if focused_set.base_note[_active.ui_position] == note_check then
