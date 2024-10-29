@@ -112,7 +112,7 @@ local function build_params(target, page_number, i)
 	track_paramset:set_action(
 		"track_retrig_time_" .. target .. "_" .. page_number .. "_" .. i,
 		function(x)
-			sequence[target][seq][page_number].conditional.retrig_time[i] = track_retrig_lookup[x]
+			sequence[target][page_number].conditional.retrig_time[i] = track_retrig_lookup[x]
 		end
 	)
 
@@ -163,7 +163,7 @@ local function build_params(target, page_number, i)
 	track_paramset:set_action(
 		"track_fill_retrig_time_" .. target .. "_" .. page_number .. "_" .. i,
 		function(x)
-			sequence[target][seq][page_number].fill.conditional.retrig_time[i] = track_retrig_lookup[x]
+			sequence[target][page_number].fill.conditional.retrig_time[i] = track_retrig_lookup[x]
 		end
 	)
 end
@@ -205,7 +205,7 @@ function track_actions.init(target, page, clear_reset)
 			100,
 			100,
 		}
-		sequence[target].page_chain = _sequins({ 1, 2})
+		sequence[target].page_chain = _sequins({ 1 })
 	end
 
 	sequence[target][page] = {}
@@ -321,6 +321,34 @@ function track_actions.init(target, page, clear_reset)
 	end
 
 	-- print("initializing sequence: " .. target .. ", " .. util.time())
+end
+
+function track_actions.trigger_step(i,step)
+	local _active = sequence[i]
+	local _a = _active[_page]
+	local focused_set = _a.focus == "main" and _a or _a.fill
+  if focused_set.trigs[index] and not focused_set.muted_trigs[index] then
+    if retrig_index == nil then
+      _ca.trigger(i, 1, vel_target, retrig_index)
+      play_linked_sample(i, step, played_note, vel_target, retrig_index)
+    else
+      local destination_vel = focused_set.velocities[index] * (focused_set.accented_trigs[index] and accent_vel or 1)
+      local destination_count = focused_set.conditional.retrig_count[index]
+      local destination_curve = focused_set.conditional.retrig_slope[index]
+      local retrig_vel
+      if destination_curve < 0 and destination_count > 0 then
+        local destination_min = lin_lin(-128, -1, 0, destination_vel, destination_curve)
+        retrig_vel = util_round(lin_lin(0, destination_count, destination_vel, destination_min, retrig_index))
+      elseif destination_curve > 0 and destination_count > 0 then
+        local destination_max = lin_lin(1, 128, 0, destination_vel, destination_curve)
+        retrig_vel = util_round(lin_lin(0, destination_count, 0, destination_max, retrig_index))
+      else
+        retrig_vel = destination_vel
+      end
+			_ca.trigger(i, step, vel_target, retrig_index)
+      -- play_linked_sample(i, step, played_note, retrig_vel, retrig_index)
+    end
+  end
 end
 
 function track_actions.change_pattern(i, j, source)
@@ -595,7 +623,7 @@ function track_actions.run(target, step)
 			and (_a.trigs[step] == true or _a.lock_trigs[step] == true or _a.legato_trigs[step] == true)
 		)
 		or (
-			_active.focus == "fill"
+			_a.focus == "fill"
 			and (_a.fill.trigs[step] == true or _a.fill.lock_trigs[step] == true or _a.fill.legato_trigs[step] == true)
 		)
 	then
@@ -673,6 +701,7 @@ function track_actions.execute_step(target, step)
 		focused_legato = _a.fill.legato_trigs[step]
 	end
   print('step executed at '..step, clock.get_beats())
+	_ca.trigger(target, 1, 127, 0)
 	-- local i, j = target, sequence[target].page
 	-- local note_check
 	-- note_check = hills_base_note[i]
@@ -707,22 +736,24 @@ function track_actions.retrig_step(target, step)
 		focused_notes = _a.fill.base_note
 	end
 	if focused_set.retrig_count[step] > 0 then
-		local base_time = (clock.get_beat_sec() * _active.time)
-		local swung_time = base_time * util.linlin(50, 100, 0, 1, _active.swing)
+		local base_time = (clock.get_beat_sec() * _a.time)
+		local swung_time = base_time * util.linlin(50, 100, 0, 1, _a.swing)
 		local i, j = target, sequence[target].page
 		_a.conditional.retrig_clock = clock.run(function()
 			for retrigs = 1, focused_set.retrig_count[step] do
-				clock.sleep(((clock.get_beat_sec() * _active.time) * focused_set.retrig_time[step]) + swung_time)
-				local note_check
-				note_check = hills_base_note[i]
-				pass_note(
-					i,
-					j,
-					hills[i][j], -- seg
-					focused_notes[step] == -1 and note_check or focused_notes[step], -- note_val
-					step, -- index
-					retrigs
-				)
+				clock.sleep(((clock.get_beat_sec() * _a.time) * focused_set.retrig_time[step]) + swung_time)
+				_ca.trigger(target, 1, 127, retrigs)
+				-- local note_check
+				-- note_check = hills_base_note[i]
+				-- pass_note(
+				-- 	i,
+				-- 	j,
+				-- 	hills[i][j], -- seg
+				-- 	focused_notes[step] == -1 and note_check or focused_notes[step], -- note_val
+				-- 	step, -- index
+				-- 	retrigs
+				-- )
+				print("re-trig executed at " .. step, clock.get_beats())
 			end
 		end)
 	end

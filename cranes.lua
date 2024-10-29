@@ -159,7 +159,7 @@ function init()
 	key2_hold_counter.time = 0.25
 	key2_hold_counter.count = 1
 	key2_hold_counter.event = function()
-		key2_hold = true
+		KEY2_hold = true
 		hardware_dirty = true
 	end
 
@@ -396,8 +396,9 @@ function init()
 	counter = metro.init(count, 0.01, -1)
 	rec_time = 0
 
-	KEY3_hold = false
 	KEY1_hold = false
+	KEY2_hold = false
+	KEY3_hold = false
 	KEY1_press = 0
 
 	hardware_redraw = metro.init(function()

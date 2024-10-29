@@ -35,9 +35,13 @@ function trx_ui.init()
     }
     ui.screen_controls[i] = {}
     ui.screen_controls[i] =
-    {
-      ["seq"] = {["focus"] = 1}
-    }
+      {
+        ["hills"] = {["focus"] = 1, ["max"] = 12}
+      , ["bounds"] = {["focus"] = 1, ["max"] = 2}
+      , ["notes"] = {["focus"] = 1, ["max"] = 12, ["transform"] = "mute step", ["velocity"] = false}
+      , ["loop"] = {["focus"] = 1, ["max"] = 2}
+      , ["samples"] = {["focus"] = 1, ["max"] = 12, ["transform"] = "shuffle"}
+      }
   end
   
   tracks_ui = {}
@@ -72,7 +76,7 @@ function trx_ui.draw_menu()
   screen.move(0,10)
   screen.aa(1)
   screen.font_size(10)
-  -- screen.text(hill_names[ui.seq_focus])
+  screen.text(ui.seq_focus)
   screen.fill()
   screen.aa(0)
   if ui.control_set ~= "seq" then
@@ -81,13 +85,12 @@ function trx_ui.draw_menu()
       screen.level(1)
       screen.rect(31,5,97,30)
       screen.fill()
-      -- local s_c = ui.screen_controls[hf][focus]
-      local menus = {"seq: "..focus,"bound","notes","loop","smpl"}
+      local menus = {"trigs","bounds","notes","loop","smpl"}
       screen.font_size(8)
       if ui.control_set == "edit" and ui.menu_focus ~= 1 then
         screen.move(0,22)
         screen.level(3)
-        screen.text("seq: "..focus)
+        screen.text("trigs")
       elseif ui.control_set == "edit" and ui.menu_focus == 1 then
         screen.move(0,32)
         screen.level(3)
@@ -255,7 +258,7 @@ function trx_ui.draw_menu()
       end
       screen.font_face(1)
 
-      if key2_hold then
+      if KEY2_hold then
         screen.font_size(8)
         screen.level(15)
         screen.move(128,64)
@@ -288,21 +291,21 @@ function trx_ui.draw_menu()
         screen.move(128,10)
         screen.text_right(sequence[hf][_page].focus == "fill" and "[FILL]" or "")
       elseif ui.menu_focus == 2 then
-        local s_c = ui.screen_controls[hf][_page]
+        local s_c = ui.screen_controls[hf]
         if ui.control_set == 'play' then
           screen.level(3)
         else
           screen.level(s_c["bounds"]["focus"] == 1 and 15 or 3)
         end
-        screen.move(32,10)
-        screen.text("min: "..sequence[hf][_page][_page].start_point)
+        screen.move(32,42)
+        screen.text("min: "..sequence[hf][_page].start_point)
         if ui.control_set == 'play' then
           screen.level(3)
         else
           screen.level(s_c["bounds"]["focus"] == 1 and 3 or 15)
         end
-        screen.move(128,10)
-        screen.text_right("max: "..sequence[hf][_page][_page].end_point)
+        screen.move(128,42)
+        screen.text_right("max: "..sequence[hf][_page].end_point)
       elseif ui.menu_focus == 3 then
         if ui.control_set == 'edit' then
           local pos = _active.ui_position
@@ -377,36 +380,30 @@ function trx_ui.draw_menu()
         local show_sign = focused_set.conditional.retrig_slope[current_step] > 0 and '+' or ''
         screen.text('SLOPE: '..show_sign..focused_set.conditional.retrig_slope[current_step])
       elseif ui.menu_focus == 2 then
-        draw_popup(norns.state.path..'img/bolt.png',6,17)
-        screen.move(15,20)
-        screen.level(15)
-        screen.text('[EUCLID]')
-        screen.move(55,20)
-        screen.level(ui.popup_focus.tracks[hf][2] == 1 and 15 or 4)
-        screen.text('PULSES: '..focused_set.er.pulses)
-        screen.move(55,30)
-        screen.level(ui.popup_focus.tracks[hf][2] == 2 and 15 or 4)
-        screen.text('STEPS: '..focused_set.er.steps)
-        screen.move(55,40)
-        screen.level(ui.popup_focus.tracks[hf][2] == 3 and 15 or 4)
-        screen.text('SHIFT: '..focused_set.er.shift)
-        screen.move(55,50)
-        screen.level(ui.popup_focus.tracks[hf][2] == 4 and 15 or 4)
-        screen.text('GENERATE (K3)')
-      elseif ui.menu_focus == 3 then
-        draw_popup(norns.state.path..'img/keys.png',9,17)
-        screen.move(55,20)
-        screen.level(ui.popup_focus.tracks[hf][3] == 1 and 15 or 4)
-        screen.text('VELOCITY: '..focused_set.velocities[current_step])
-        screen.move(55,30)
-        screen.level(ui.popup_focus.tracks[hf][3] == 2 and 15 or 4)
-        screen.text('CHORD DEG: '..focused_set.chord_degrees[current_step])
+        -- draw_popup(norns.state.path..'img/bolt.png',6,17)
+        -- screen.move(15,20)
+        -- screen.level(15)
+        -- screen.text('[EUCLID]')
+        -- screen.move(55,20)
+        -- screen.level(ui.popup_focus.tracks[hf][2] == 1 and 15 or 4)
+        -- screen.text('PULSES: '..focused_set.er.pulses)
+        -- screen.move(55,30)
+        -- screen.level(ui.popup_focus.tracks[hf][2] == 2 and 15 or 4)
+        -- screen.text('STEPS: '..focused_set.er.steps)
         -- screen.move(55,40)
         -- screen.level(ui.popup_focus.tracks[hf][2] == 3 and 15 or 4)
         -- screen.text('SHIFT: '..focused_set.er.shift)
         -- screen.move(55,50)
         -- screen.level(ui.popup_focus.tracks[hf][2] == 4 and 15 or 4)
         -- screen.text('GENERATE (K3)')
+      elseif ui.menu_focus == 3 then
+        -- draw_popup(norns.state.path..'img/keys.png',9,17)
+        -- screen.move(55,20)
+        -- screen.level(ui.popup_focus.tracks[hf][3] == 1 and 15 or 4)
+        -- screen.text('VELOCITY: '..focused_set.velocities[current_step])
+        -- screen.move(55,30)
+        -- screen.level(ui.popup_focus.tracks[hf][3] == 2 and 15 or 4)
+        -- screen.text('CHORD DEG: '..focused_set.chord_degrees[current_step])
       end
       -- elseif grid_conditional_entry and #conditional_entry_steps.focus[hf] == 0 and ui.control_set == 'edit' then
       --   if ui.menu_focus == 1 then
@@ -436,18 +433,19 @@ function trx_ui.parse_grid(x,y,z)
   local i = ui.seq_focus
   local j = tracks_ui.seq_page[i]
 	local focused_set = _a.focus == "main" and _a or _a.fill
-  if x >= 9 and y >= 9 and y <= 11 and z == 1 then
-    sequence[i][j].ui_position = ((y-9)*8) + (x-8)
-		_tracks.change_trig_state(focused_set, sequence[i][j].ui_position, not focused_set.trigs[sequence[i][j].ui_position], i, j, _page)
+  if x >= 1 and x<= 8 and y >= 9 and y <= 11 and z == 1 then
+    sequence[i].ui_position = ((y-9)*8) + (x)
+		_tracks.change_trig_state(focused_set, sequence[i].ui_position, not focused_set.trigs[sequence[i].ui_position], i, j, _page)
+  elseif x >= 13 and x <= 16 and y >= 9 and y <= 10 and z == 1 and ui.control_set == 'edit' then
+    local sel = (x - 12) + ((y-9)*4)
+    tracks_ui.seq_page[hf] = sel
   end
 end
 
 function trx_ui.draw_grid(v)
+	local p = tracks_ui.seq_page[v]
   if ui.control_set == 'play' or ui.control_set == 'edit' then
-    -- local p = sequence[v].page
-    local p = tracks_ui.seq_page[v]
 		local this_seq = sequence[v][p]
-		-- local this_seq = tracks_ui.seq_page[v]
     for s = this_seq.start_point, this_seq.end_point do
       local x = util.wrap(s,1,8)
       local batch = s <= 8 and 1 or (s<= 16 and 2 or 3)
@@ -457,7 +455,7 @@ function trx_ui.draw_grid(v)
       else
         brightness = this_seq.trigs[s] and 5 or 2
       end
-      g:led(x+8, batch+8, brightness)
+      g:led(x, batch+8, brightness)
     end
   elseif ui.control_set == 'step_parameters' then
 		for s = step.seq[v].locks.start_point, step.seq[v].locks.end_point do
@@ -482,18 +480,37 @@ function trx_ui.draw_grid(v)
       g:led(s+1,v,brightness)
     end
   end
+	for x = 13,16 do
+    for y = 9,10 do
+      g:led(x,y,2)
+      local sel = (x - 12) + ((y-9)*4)
+      if ui.control_set == 'edit' then
+        if sequence[v].page == sel and sequence[v].page ~= p then
+          g:led(x,y,5)
+        elseif sequence[v].page == sel and sequence[v].page == p then
+					g:led(x, y, 10)
+        elseif p == sel then
+					g:led(x, y, 10)
+        end
+      else
+				if sequence[v].page == sel then
+					g:led(x, y, 10)
+				end
+      end
+    end
+  end
 end
 
 local conditional_modes = {"NOT NEI","NEI","NOT PRE","PRE","A:B"}
 
 function trx_ui.cycle_conditional(i,j,step,d)
-  local _active = sequence[i][j]
+  local _active = sequence[i]
   local _a = _active[tracks_ui.seq_page[i]] -- here, we want the UI page, not the tracked page
   local send_to_many = false
   if grid_conditional_entry and #conditional_entry_steps.focus[i] > 1 then
     step = conditional_entry_steps.focus[i][#conditional_entry_steps.focus[i]]
   end
-  local focused_set = _active.focus == 'main' and _a or _a.fill
+  local focused_set = _a.focus == 'main' and _a or _a.fill
   if d > 0 then
     if focused_set.conditional.mode[step] == "A:B" then
       local current_B = focused_set.conditional.B[step]
@@ -552,9 +569,9 @@ function trx_ui.cycle_conditional(i,j,step,d)
 end
 
 function trx_ui.cycle_prob(i,j,step,d)
-  local _active = sequence[i][j]
+  local _active = sequence[i]
   local _a = _active[tracks_ui.seq_page[i]]
-  local focused_set = _active.focus == 'main' and _a or _a.fill
+  local focused_set = _a.focus == 'main' and _a or _a.fill
   if grid_conditional_entry and #conditional_entry_steps.focus[i] > 1 then
     step = conditional_entry_steps.focus[i][#conditional_entry_steps.focus[i]]
   end
@@ -565,29 +582,30 @@ function trx_ui.cycle_prob(i,j,step,d)
 end
 
 function trx_ui.cycle_retrig_count(i,j,step,d)
-  local _active = sequence[i][j]
+  local _active = sequence[i]
   local _a = _active[tracks_ui.seq_page[i]]
-  local focused_set = _active.focus == 'main' and _a or _a.fill
+  local focused_set = _a.focus == 'main' and _a or _a.fill
   focused_set.conditional.retrig_count[step] = util.clamp(focused_set.conditional.retrig_count[step]+d, 0, 128)
 end
 
 function trx_ui.cycle_retrig_time(i,j,step,d)
-  local _active = sequence[i][j]
-  local focused_set = _active.focus == 'main' and ('track_retrig_time_'..i..'_'..j..'_'.._active.page..'_'..step) or ('track_fill_retrig_time_'..i..'_'.._active.page..'_'..step)
+  local _active = sequence[i]
+	local _a = _active[tracks_ui.seq_page[i]]
+  local focused_set = _a.focus == 'main' and ('track_retrig_time_'..i..'_'.._active.page..'_'..step) or ('track_fill_retrig_time_'..i..'_'.._active.page..'_'..step)
   track_paramset:delta(focused_set,d)
 end
 
 function trx_ui.cycle_retrig_vel(i,j,step,d)
-  local _active = sequence[i][j]
+  local _active = sequence[i]
   local _a = _active[tracks_ui.seq_page[i]]
-  local focused_set = _active.focus == 'main' and _a or _a.fill
+  local focused_set = _a.focus == 'main' and _a or _a.fill
   focused_set.conditional.retrig_slope[step] = util.clamp(focused_set.conditional.retrig_slope[step]+d, -128, 128)
 end
 
 function trx_ui.cycle_er_param(prm,i,j,d)
-  local _active = sequence[i][j]
+  local _active = sequence[i]
   local _a = _active[tracks_ui.seq_page[i]]
-  local focused_set = _active.focus == 'main' and _a or _a.fill
+  local focused_set = _a.focus == 'main' and _a or _a.fill
   if prm == 'pulses' then
     focused_set.er[prm] = util.clamp(focused_set.er[prm] + d, 0, focused_set.er.steps)
   elseif prm == 'steps' then
@@ -598,9 +616,9 @@ function trx_ui.cycle_er_param(prm,i,j,d)
 end
 
 function trx_ui.cycle_chord_degrees(i,j,step,d)
-  local _active = sequence[i][j]
+  local _active = sequence[i]
   local _a = _active[tracks_ui.seq_page[i]]
-  local focused_set = _active.focus == 'main' and _a or _a.fill
+  local focused_set = _a.focus == 'main' and _a or _a.fill
   focused_set.chord_degrees[step] = util.clamp(focused_set.chord_degrees[step] + d, 1, 7)
 end
 

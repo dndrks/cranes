@@ -73,6 +73,14 @@ function ca.init(track_count)
 
 end
 
+function ca.trigger(bank, pad, velocity, retrig_index)
+	if chosen_mode[bank] == "chop" then
+		_ca.play_slice(bank, pad, velocity, nil, retrig_index)
+	elseif chosen_mode[bank] == "folder" then
+		_ca.play_index(bank, pad, velocity, nil, retrig_index)
+	end
+end
+
 -- function ca.sample_callback(path,i,summed)
 --   if path ~= "cancel" and path ~= "" then
 --     ca.load_sample(path,i,summed)

@@ -2,7 +2,7 @@ local enc_actions = {}
 
 function enc_actions.delta_track_pos(i, j, d, jump_page)
 	if not jump_page then
-		print("before", i, j, sequence[i][j].ui_position,tracks_ui.seq_page[i])
+		-- print("before", i, j, sequence[i][j].ui_position,tracks_ui.seq_page[i])
 		if sequence[i][j].ui_position + d < 1 then
 			local pre_change = tracks_ui.seq_page[i]
 			tracks_ui.seq_page[i] = util.clamp(tracks_ui.seq_page[i] - 1, 1, 8)
@@ -21,7 +21,7 @@ function enc_actions.delta_track_pos(i, j, d, jump_page)
 	else
 		tracks_ui.seq_page[i] = util.clamp(tracks_ui.seq_page[i] + (d > 0 and 1 or -1), 1, 8)
 	end
-	print("after", i, j, sequence[i][j].ui_position, tracks_ui.seq_page[i])
+	-- print("after", i, j, sequence[i][j].ui_position, tracks_ui.seq_page[i])
 end
 
 function check_for_menu_condition(i)
@@ -37,7 +37,7 @@ function enc_actions.parse(n, d)
 		_fkprm.enc(n, d)
 	else
 		-- local s_c = ui.screen_controls[ui.seq_focus][hills[ui.seq_focus].screen_focus]
-		local s_c = ui.screen_controls[ui.seq_focus][1]
+		local s_c = ui.screen_controls[ui.seq_focus]
 		local i = ui.seq_focus
 		-- local j = hills[i].screen_focus
 		local j = tracks_ui.seq_page[i]
@@ -50,7 +50,7 @@ function enc_actions.parse(n, d)
 						ui.menu_focus = 4
 					end
 				end
-        tracks_ui.seq_page[ui.seq_focus] = math.ceil(sequence[ui.seq_focus][j].ui_position / 32)
+        tracks_ui.seq_page[ui.seq_focus] = sequence[ui.seq_focus].page
 			elseif ui.control_set == "edit" then
 				if key1_hold then
 					enc_actions.delta_track_pos(i, j, d)
@@ -84,9 +84,9 @@ function enc_actions.parse(n, d)
             ui.popup_focus.tracks[i][2] = util.clamp(ui.popup_focus.tracks[i][2] + d, 1, 4)
           else
             s_c["bounds"]["focus"] = util.clamp(s_c["bounds"]["focus"] + d, 1, s_c["bounds"]["max"])
-            for _hills = 1, 8 do
-              ui.screen_controls[ui.seq_focus][_hills]["bounds"]["focus"] = s_c["bounds"]["focus"]
-            end
+            -- for _hills = 1, 8 do
+            --   ui.screen_controls[ui.seq_focus]["bounds"]["focus"] = s_c["bounds"]["focus"]
+            -- end
           end
         elseif ui.menu_focus == 3 then
           if key1_hold then
@@ -113,15 +113,15 @@ function enc_actions.parse(n, d)
             -- if key1_hold then
             if check_for_menu_condition(i) then
               if ui.popup_focus.tracks[i][1] == 1 then
-                _hsteps.cycle_conditional(i, j, _pos, d)
+                _tUi.cycle_conditional(i, j, _pos, d)
               elseif ui.popup_focus.tracks[i][1] == 2 then
-                _hsteps.cycle_prob(i, j, _pos, d)
+                _tUi.cycle_prob(i, j, _pos, d)
               elseif ui.popup_focus.tracks[i][1] == 3 then
-                _hsteps.cycle_retrig_count(i, j, _pos, d)
+                _tUi.cycle_retrig_count(i, j, _pos, d)
               elseif ui.popup_focus.tracks[i][1] == 4 then
-                _hsteps.cycle_retrig_time(i, j, _pos, d)
+                _tUi.cycle_retrig_time(i, j, _pos, d)
               elseif ui.popup_focus.tracks[i][1] == 5 then
-                _hsteps.cycle_retrig_vel(i, j, _pos, d)
+                _tUi.cycle_retrig_vel(i, j, _pos, d)
               end
             else
               local _active = sequence[i]
@@ -159,27 +159,27 @@ function enc_actions.parse(n, d)
         elseif ui.menu_focus == 2 and ui.control_set == "edit" then
           if key1_hold then
             if ui.popup_focus.tracks[i][2] == 1 then
-              _hsteps.cycle_er_param("pulses", i, j, d)
+              _tUi.cycle_er_param("pulses", i, j, d)
             elseif ui.popup_focus.tracks[i][2] == 2 then
-              _hsteps.cycle_er_param("steps", i, j, d)
+              _tUi.cycle_er_param("steps", i, j, d)
             elseif ui.popup_focus.tracks[i][2] == 3 then
-              _hsteps.cycle_er_param("shift", i, j, d)
+              _tUi.cycle_er_param("shift", i, j, d)
             end
           else
-            local _page = sequence[i][j].page
+            local _page = tracks_ui.seq_page[i]
             if s_c["bounds"]["focus"] == 1 then
-              sequence[i][j][_page].start_point =
-                util.clamp(sequence[i][j][_page].start_point + d, 1, sequence[i][j][_page].end_point)
+              sequence[i][_page].start_point =
+                util.clamp(sequence[i][_page].start_point + d, 1, sequence[i][_page].end_point)
             elseif s_c["bounds"]["focus"] == 2 then
-              sequence[i][j][_page].end_point =
-                util.clamp(sequence[i][j][_page].end_point + d, sequence[i][j][_page].start_point, 16)
+              sequence[i][_page].end_point =
+                util.clamp(sequence[i][_page].end_point + d, sequence[i][_page].start_point, 24)
             end
           end
         elseif ui.menu_focus == 3 and ui.control_set == "edit" then
           if key1_hold then
             if ui.popup_focus.tracks[i][3] == 1 then
             elseif ui.popup_focus.tracks[i][3] == 2 then
-              _hsteps.cycle_chord_degrees(i, j, _pos, d)
+              _tUi.cycle_chord_degrees(i, j, _pos, d)
             end
           else
             _t.track_transpose(i, j, tracks_ui.seq_page[i], sequence[i][j].ui_position, d)

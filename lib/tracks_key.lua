@@ -32,13 +32,13 @@ function key_actions.parse(n, z)
 				end
 			elseif n == 3 then
 				if ui.control_set == "play" then
-					if key2_hold and not key1_hold then
+					if KEY2_hold and not key1_hold then
 						_fkprm.flip_to_fkprm("play")
 					else
 						ui.control_set = "edit"
 					end
 				elseif ui.control_set == "edit" then
-					if key2_hold and not key1_hold then
+					if KEY2_hold and not key1_hold then
 						_fkprm.flip_to_fkprm("edit")
 					else
             if ui.menu_focus == 1 then
@@ -73,7 +73,7 @@ function key_actions.parse(n, z)
 			if n == 1 and ui.control_set ~= "edit" then
 				key1_hold = false
 			elseif n == 2 and not ignore_key2_up then
-				if key2_hold == false then
+				if KEY2_hold == false then
 					key2_hold_counter:stop()
 					if key1_hold then
 						key1_hold = false
@@ -86,11 +86,11 @@ function key_actions.parse(n, z)
 						key1_hold = false
 					end
 				else
-					key2_hold = false
+					KEY2_hold = false
 				end
 			elseif n == 2 and ignore_key2_up then
 				ignore_key2_up = false
-				key2_hold = false
+				KEY2_hold = false
 			end
 		end
 	end

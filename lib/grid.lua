@@ -47,11 +47,7 @@ function parse_cheat(x,y,z)
     y = size == 256 and y-8 or y
     if x >= grid_coordinates[size].squares[bank_source][1] and x <= grid_coordinates[size].squares[bank_source][1] + 3 then
       local which_pad = x - (6*(bank_source-1)) + (4*(y-5))
-			if chosen_mode[bank_source] == 'chop' then
-      	_ca.play_slice(bank_source,which_pad, 127)
-			elseif chosen_mode[bank_source] == 'folder' then
-				_ca.play_index(bank_source,which_pad, 127)
-			end
+			_ca.trigger(bank_source,which_pad,127)
     end
   end
 end
@@ -110,7 +106,7 @@ function grid_redraw()
 	draw_cheat(1, 13)
 	draw_cheat(7, 13)
 	draw_cheat(13, 13)
-	_tUi.draw_grid(1)
+	_tUi.draw_grid(ui.seq_focus)
 	g:refresh()
 end
 

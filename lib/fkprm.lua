@@ -90,7 +90,7 @@ m.key = function(n, z)
 		else
 			m.flip_from_fkprm()
 			ignore_key2_up = true
-			key2_hold = false
+			KEY2_hold = false
 		end
 	elseif n == 3 and z == 1 and key1_hold then
 		if m.alt_menu_focus == 1 or m.alt_menu_focus == 4 then
