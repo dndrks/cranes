@@ -89,8 +89,8 @@ for i = 1, TRACKS do
 end
 
 speedlist = {
-  { -4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0 },
-  { -4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0 }
+	{ -4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0 },
+	{ -4.0, -2.0, -1.0, -0.5, -0.25, 0, 0.25, 0.5, 1.0, 2.0, 4.0 },
 }
 overdub_strength = { 0.0, 0.0 }
 clear = true
@@ -759,10 +759,10 @@ g = grid.connect()
 g.key = function(x, y, z)
 	-- speed + direction
 	if (y == 1 or y == 5) and z == 1 then
-    local voice = y == 1 and 1 or 2
-    local other_voice = y == 1 and 2 or 1
+		local voice = y == 1 and 1 or 2
+		local other_voice = y == 1 and 2 or 1
 		if x <= #speedlist[voice] then
-			params:set("speed_voice_"..voice, x)
+			params:set("speed_voice_" .. voice, x)
 		elseif x == 13 then
 			softcut.position(voice, track[other_voice].poll_position)
 		elseif x == 14 then
@@ -884,7 +884,11 @@ function grid_redraw()
 	g:led(3, 7, 9)
 	g:led(2, 7, 9)
 	g:led(1, 7, 5)
-	g:led(selected_preset[1], 2, 12)
-	g:led(selected_preset[2], 6, 12)
+	if selected_preset[1] ~= 0 then
+		g:led(selected_preset[1], 2, 12)
+	end
+	if selected_preset[2] ~= 0 then
+		g:led(selected_preset[2], 6, 12)
+	end
 	g:refresh()
 end
