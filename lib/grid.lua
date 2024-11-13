@@ -195,6 +195,10 @@ function draw_cranes()
 	g:led(3, 7, 9)
 	g:led(2, 7, 9)
 	g:led(1, 7, 5)
-	g:led(selected_preset[1], 2, 12)
-	g:led(selected_preset[2], 6, 12)
+	if selected_preset[1] ~= 0 then
+		g:led(selected_preset[1], 2, 12)
+	end
+	if selected_preset[2] ~= 0 then
+		g:led(selected_preset[2], 6, 12)
+	end
 end

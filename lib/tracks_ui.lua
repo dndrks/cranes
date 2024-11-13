@@ -146,7 +146,8 @@ function trx_ui.draw_menu()
             elseif focused_set.lock_trigs[i] then
               display_step_data = 'P'
             else
-              display_step_data = '|'
+              -- display_step_data = '|'
+							display_step_data = focused_set.pad_id[i]
             end
           else
             if focused_set.lock_trigs[i] then
@@ -156,9 +157,9 @@ function trx_ui.draw_menu()
             end
           end
         else
-          local note_index = focused_set.base_note[i]
+          local note_index = focused_set.pad_id[i]
           if focused_set.trigs[i] == true then
-            if focused_set.base_note[i] == -1 then
+            if focused_set.pad_id[i] == 0 then
               local note_check
               if params:string('voice_model_'..hf) ~= 'sample' and params:string('voice_model_'..hf) ~= 'input' then
                 note_check = params:get(hf..'_'..params:string('voice_model_'..hf)..'_carHz')
@@ -197,7 +198,7 @@ function trx_ui.draw_menu()
           -- else
           --   note_check = params:get('hill '..hf..' base note')
           -- end
-          -- if focused_set.base_note[i] == note_check then
+          -- if focused_set.pad_id[i] == note_check then
           --   if e_pos == i then
           --     screen.level(15)
           --   else
@@ -276,7 +277,7 @@ function trx_ui.draw_menu()
 
       if ui.menu_focus == 1 then
         screen.level(15)
-        screen.move(128,10)
+        screen.move(128,42)
         if grid_mute then
           screen.text_right("[STEP MUTE]")
         elseif grid_accent then
@@ -288,7 +289,7 @@ function trx_ui.draw_menu()
             screen.text_right('[SET LOOP END]')
           end
         end
-        screen.move(128,10)
+        screen.move(128,42)
         screen.text_right(sequence[hf][_page].focus == "fill" and "[FILL]" or "")
       elseif ui.menu_focus == 2 then
         local s_c = ui.screen_controls[hf]
@@ -320,7 +321,7 @@ function trx_ui.draw_menu()
             else
               note_check = params:get('hill '..hf..' base note')
             end
-            if focused_set.base_note[pos] == note_check then
+            if focused_set.pad_id[pos] == note_check then
               display_text = 'K3: clear to default'
             end
           end
@@ -433,29 +434,43 @@ function trx_ui.parse_grid(x,y,z)
   local i = ui.seq_focus
   local j = tracks_ui.seq_page[i]
 	local focused_set = _a.focus == "main" and _a or _a.fill
-  if x >= 1 and x<= 8 and y >= 9 and y <= 11 and z == 1 then
-    sequence[i].ui_position = ((y-9)*8) + (x)
+  if x >= 4 and x<= 11 and y >= 9 and y <= 11 and z == 1 then
+    sequence[i].ui_position = ((y-9)*8) + (x-3)
 		_tracks.change_trig_state(focused_set, sequence[i].ui_position, not focused_set.trigs[sequence[i].ui_position], i, j, _page)
-  elseif x >= 13 and x <= 16 and y >= 9 and y <= 10 and z == 1 and ui.control_set == 'edit' then
-    local sel = (x - 12) + ((y-9)*4)
-    tracks_ui.seq_page[hf] = sel
+  elseif x >= 13 and x <= 16 and y >= 9 and y <= 10 and z == 1 then
+    if ui.control_set ~= 'edit' then
+      ui.control_set = 'edit'
+    end
+    if ui.control_set == 'edit' then
+      local sel = (x - 12) + ((y-9)*4)
+      tracks_ui.seq_page[hf] = sel
+    end
+  elseif x == 1 and y >= 9 and y <= 11 then
+    ui.seq_focus = y - 8
+  elseif x == 16 and y == 11 then
+    _a.focus = z == 1 and "fill" or "main"
   end
 end
 
 function trx_ui.draw_grid(v)
 	local p = tracks_ui.seq_page[v]
+  for i = 1,3 do
+    g:led(1, i + 8, ui.seq_focus == i and 12 or 3)
+  end
+  g:led(16,11,sequence[v][p].focus == "main" and 1 or 10)
   if ui.control_set == 'play' or ui.control_set == 'edit' then
 		local this_seq = sequence[v][p]
     for s = this_seq.start_point, this_seq.end_point do
       local x = util.wrap(s,1,8)
       local batch = s <= 8 and 1 or (s<= 16 and 2 or 3)
       local brightness
-      if this_seq.step == s and sequence[v].playing then
-        brightness = this_seq.trigs[s] and 15 or 10
+      local focused = this_seq.focus == "main" and sequence[v][p] or sequence[v][p].fill
+      if this_seq.step == s and sequence[v].playing and tracks_ui.seq_page[v] == sequence[v].page then
+        brightness = focused.trigs[s] and 15 or 10
       else
-        brightness = this_seq.trigs[s] and 5 or 2
+        brightness = focused.trigs[s] and 5 or 2
       end
-      g:led(x, batch+8, brightness)
+      g:led(x+3, batch+8, brightness)
     end
   elseif ui.control_set == 'step_parameters' then
 		for s = step.seq[v].locks.start_point, step.seq[v].locks.end_point do

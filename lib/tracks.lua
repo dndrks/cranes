@@ -221,7 +221,7 @@ function track_actions.init(target, page, clear_reset)
 	sequence[target][page].mode = "fwd"
 	sequence[target][page].loop = true
 	sequence[target][page].focus = "main"
-  sequence[target][page].base_note = {}
+  sequence[target][page].pad_id = {}
   sequence[target][page].seed_default_note = {}
   sequence[target][page].chord_degrees = {}
   sequence[target][page].octave_offset = {}
@@ -246,7 +246,8 @@ function track_actions.init(target, page, clear_reset)
   sequence[target][page].conditional.retrig_slope = {}
 		-- sequence[target][seq][pages].focus = "main"
   sequence[target][page].fill = {
-    ["base_note"] = {},
+		["swing"] = 50,
+    ["pad_id"] = {},
     ["seed_default_note"] = {},
     ["chord_degrees"] = {},
     ["octave_offset"] = {},
@@ -271,7 +272,7 @@ function track_actions.init(target, page, clear_reset)
   sequence[target][page].end_point = 24
 		
   for i = 1, 24 do
-    sequence[target][page].base_note[i] = -1
+    sequence[target][page].pad_id[i] = 1
     sequence[target][page].seed_default_note[i] = true
     sequence[target][page].chord_degrees[i] = 1
     sequence[target][page].octave_offset[i] = 0
@@ -295,7 +296,7 @@ function track_actions.init(target, page, clear_reset)
     )]
     sequence[target][page].conditional.retrig_slope[i] = 0
 
-    sequence[target][page].fill.base_note[i] = -1
+    sequence[target][page].fill.pad_id[i] = 1
     sequence[target][page].fill.seed_default_note[i] = true
     sequence[target][page].fill.chord_degrees[i] = 1
     sequence[target][page].fill.octave_offset[i] = 0
@@ -327,10 +328,11 @@ function track_actions.trigger_step(i,step)
 	local _active = sequence[i]
 	local _a = _active[_page]
 	local focused_set = _a.focus == "main" and _a or _a.fill
+	local focused_pad = focused_set.pad_id
   if focused_set.trigs[index] and not focused_set.muted_trigs[index] then
     if retrig_index == nil then
-      _ca.trigger(i, 1, vel_target, retrig_index)
-      play_linked_sample(i, step, played_note, vel_target, retrig_index)
+      _ca.trigger(i, focused_pad, vel_target, retrig_index)
+      play_linked_sample(i, step, focused_pad, vel_target, retrig_index)
     else
       local destination_vel = focused_set.velocities[index] * (focused_set.accented_trigs[index] and accent_vel or 1)
       local destination_count = focused_set.conditional.retrig_count[index]
@@ -345,7 +347,7 @@ function track_actions.trigger_step(i,step)
       else
         retrig_vel = destination_vel
       end
-			_ca.trigger(i, step, vel_target, retrig_index)
+			_ca.trigger(i, focused_pad, vel_target, retrig_index)
       -- play_linked_sample(i, step, played_note, retrig_vel, retrig_index)
     end
   end
@@ -509,7 +511,7 @@ end
 -- end
 
 function track_actions.change_trig_state(target_track, target_step, state, i, j, _page)
-	print('change_trig_state:',target_track,target_step,state, _page)
+	-- print('change_trig_state:',target_track,target_step,state, _page)
 	target_track.trigs[target_step] = state
 	if state == true then
 		if tab.count(_fkprm.adjusted_params_lock_trigs[i][j][_page][target_step].params) > 0 then
@@ -526,6 +528,7 @@ function track_actions.process(target)
 	_active = sequence[target][sequence[target].page]
   -- if target == 1 then print('>>> '.._active.step) end
 	screen_dirty = true
+	hardware_dirty = true
 	track_actions.run(target, _active.step)
 end
 
@@ -689,22 +692,22 @@ function track_actions.execute_step(target, step)
 	local _active = sequence[target]
 	local _a = _active[_active.page]
 	local focused_trigs = {}
-	local focused_notes = {}
+	local focused_pad = {}
 	local focused_legato = {}
 	if _a.focus == "main" then
 		focused_trigs = _a.trigs[step]
-		focused_notes = _a.base_note[step]
+		focused_pad = _a.pad_id[step]
 		focused_legato = _a.legato_trigs[step]
 	else
 		focused_trigs = _a.fill.trigs[step]
-		focused_notes = _a.fill.base_note[step]
+		focused_pad = _a.fill.pad_id[step]
 		focused_legato = _a.fill.legato_trigs[step]
 	end
-  print('step executed at '..step, clock.get_beats())
-	_ca.trigger(target, 1, 127, 0)
+  -- print('step executed at '..step, clock.get_beats())
+	_ca.trigger(target, focused_pad, 127, 0)
 	-- local i, j = target, sequence[target].page
 	-- local note_check
-	-- note_check = hills_base_note[i]
+	-- note_check = hills_pad_id[i]
 	-- pass_note(
 	-- 	i,
 	-- 	j,
@@ -730,10 +733,10 @@ function track_actions.retrig_step(target, step)
 	local focused_set, focused_notes = {}, {}
 	if _a.focus == "main" then
 		focused_set = _a.conditional
-		focused_notes = _a.base_note
+		focused_pad = _a.pad_id
 	else
 		focused_set = _a.fill.conditional
-		focused_notes = _a.fill.base_note
+		focused_pad = _a.fill.pad_id
 	end
 	if focused_set.retrig_count[step] > 0 then
 		local base_time = (clock.get_beat_sec() * _a.time)
@@ -742,9 +745,9 @@ function track_actions.retrig_step(target, step)
 		_a.conditional.retrig_clock = clock.run(function()
 			for retrigs = 1, focused_set.retrig_count[step] do
 				clock.sleep(((clock.get_beat_sec() * _a.time) * focused_set.retrig_time[step]) + swung_time)
-				_ca.trigger(target, 1, 127, retrigs)
+				_ca.trigger(target, focused_pad, 127, retrigs)
 				-- local note_check
-				-- note_check = hills_base_note[i]
+				-- note_check = hills_pad_id[i]
 				-- pass_note(
 				-- 	i,
 				-- 	j,
@@ -768,9 +771,9 @@ function track_actions.reset_note_to_default(i, j)
 	local _a = _active[_active.page]
 	local focused_set = _a.focus == "main" and _a or _a.fill
 	local note_check
-	note_check = hills_base_note[i]
-	if focused_set.base_note[_active.ui_position] == note_check then
-		focused_set.base_note[_active.ui_position] = -1
+	note_check = hills_pad_id[i]
+	if focused_set.pad_id[_active.ui_position] == note_check then
+		focused_set.pad_id[_active.ui_position] = 1
 	end
 end
 

@@ -137,9 +137,11 @@ function enc_actions.parse(n, d)
                     j,
                     tracks_ui.seq_page[i]
                   )
+                else
+                  focused_set.pad_id[_pos] = util.clamp(focused_set.pad_id[_pos] + d, 1, 16)
                 end
               else
-                if focused_set.trigs[_pos] == true then
+                if focused_set.trigs[_pos] == true and focused_set.pad_id[_pos] == 1 then
                   _tracks.change_trig_state(
                     focused_set,
                     _pos,
@@ -148,6 +150,8 @@ function enc_actions.parse(n, d)
                     j,
                     tracks_ui.seq_page[i]
                   )
+                elseif focused_set.trigs[_pos] == true then
+                  focused_set.pad_id[_pos] = util.clamp(focused_set.pad_id[_pos]+d,1,16)
                 end
               end
             end
