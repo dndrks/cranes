@@ -87,6 +87,7 @@ CCSample {
 
 			filterQ = LinLin.kr(filterQ,0,100,1.0,0.001);
 			eqAmp = LinLin.kr(eqAmp,-2.0,2.0,-10.0,10.0);
+			ampMod = EaseInOutQuart.value(ampMod);
 
 			// sample handling all adapted from Zack Scholl: https://schollz.com/blog/sampler/
 

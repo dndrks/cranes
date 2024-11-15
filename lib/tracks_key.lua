@@ -79,6 +79,7 @@ function key_actions.parse(n, z)
 						key1_hold = false
 					else
 						ui.control_set = ui.control_set ~= "play" and "play" or "song"
+						tracks_ui.seq_page[i] = sequence[i].page
 						grid_conditional_entry = false
 						conditional_entry_steps.focus[i] = {}
 					end

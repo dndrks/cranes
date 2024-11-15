@@ -126,7 +126,7 @@ function enc_actions.parse(n, d)
             else
               local _active = sequence[i]
               local _a = _active[tracks_ui.seq_page[i]]
-              local focused_set = _a.focus == "main" and _a or _a.fill
+              local focused_set = _active.focus == "main" and _a or _a.fill
               if d > 0 then
                 if focused_set.trigs[_pos] == false then
                   _tracks.change_trig_state(

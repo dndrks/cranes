@@ -54,7 +54,11 @@ function trx_ui.init()
   tracks_ui.seq_page = {1,1,1,1,1,1,1,1,1,1}
   tracks_ui.alt_view_sel = 1
   tracks_ui.alt_fill_sel = 1
+  tracks_ui.show_chain = false
+  tracks_ui.show_chain_edit_position = { 1, 1, 1 }
+	tracks_ui.show_chain_edit_page = { 1, 1, 1 }
   tracks_ui.fill = {}
+  tracks_ui.show_fill = false
   _hui = tracks_ui
 end
 
@@ -107,7 +111,10 @@ function trx_ui.draw_menu()
         end
       end
 
-      local focused_set = _a.focus == "main" and _a or _a.fill
+      local focused_set = _target.focus == "main" and _a or _a.fill
+      if ui.control_set == 'edit' then
+        focused_set = tracks_ui.show_fill and _a.fill or _a
+      end
       screen.move(0,10)
       screen.level(3)
       screen.level(_hui.focus == "seq" and 8 or 0)
@@ -289,8 +296,12 @@ function trx_ui.draw_menu()
             screen.text_right('[SET LOOP END]')
           end
         end
-        screen.move(128,42)
-        screen.text_right(sequence[hf][_page].focus == "fill" and "[FILL]" or "")
+        screen.move(84,62)
+        if ui.control_set == 'play' then
+          screen.text(sequence[hf].focus == "fill" and "[FILL]" or "")
+        elseif ui.control_set == 'edit' then
+          screen.text(tracks_ui.show_fill and "[FILL]" or "")
+        end
       elseif ui.menu_focus == 2 then
         local s_c = ui.screen_controls[hf]
         if ui.control_set == 'play' then
@@ -433,22 +444,48 @@ function trx_ui.parse_grid(x,y,z)
 	local _a = sequence[hf][_page]
   local i = ui.seq_focus
   local j = tracks_ui.seq_page[i]
-	local focused_set = _a.focus == "main" and _a or _a.fill
+	local focused_set = _target.focus == "main" and _a or _a.fill
+  -- main step space:
   if x >= 4 and x<= 11 and y >= 9 and y <= 11 and z == 1 then
-    sequence[i].ui_position = ((y-9)*8) + (x-3)
-		_tracks.change_trig_state(focused_set, sequence[i].ui_position, not focused_set.trigs[sequence[i].ui_position], i, j, _page)
+    if tracks_ui.show_chain then
+      tracks_ui.show_chain_edit_position[i] = util.clamp(((y-9)*8) + (x-3),1,#sequence[i].page_chain+1)
+    else
+			if ui.control_set == "play" then
+				focused_set = _target.focus == "main" and _a or _a.fill
+			else
+				focused_set = tracks_ui.show_fill and _a.fill or _a
+			end
+      sequence[i].ui_position = ((y-9)*8) + (x-3)
+      _tracks.change_trig_state(focused_set, sequence[i].ui_position, not focused_set.trigs[sequence[i].ui_position], i, j, _page)
+    end
+  -- sequencer pages:
   elseif x >= 13 and x <= 16 and y >= 9 and y <= 10 and z == 1 then
+    local sel = (x - 12) + ((y - 9) * 4)
     if ui.control_set ~= 'edit' then
       ui.control_set = 'edit'
+    elseif tracks_ui.seq_page[hf] == sel and not tracks_ui.show_chain then
+      ui.control_set = 'play'
+      tracks_ui.seq_page[hf] = sequence[hf].page
     end
     if ui.control_set == 'edit' then
-      local sel = (x - 12) + ((y-9)*4)
-      tracks_ui.seq_page[hf] = sel
+      if tracks_ui.show_chain then
+        tracks_ui.show_chain_edit_page[hf] = sel
+				sequence[hf].page_chain_ids[tracks_ui.show_chain_edit_position[hf]] = sel
+				sequence[hf].page_chain:settable(sequence[hf].page_chain_ids)
+      else
+        tracks_ui.seq_page[hf] = sel
+      end
     end
   elseif x == 1 and y >= 9 and y <= 11 then
     ui.seq_focus = y - 8
+  elseif x == 12 and y == 12 then
+    if ui.control_set == 'play' then
+      _target.focus = z == 1 and "fill" or "main"
+    else
+      tracks_ui.show_fill = z == 1
+    end
   elseif x == 16 and y == 11 then
-    _a.focus = z == 1 and "fill" or "main"
+    tracks_ui.show_chain = z == 1
   end
 end
 
@@ -457,20 +494,50 @@ function trx_ui.draw_grid(v)
   for i = 1,3 do
     g:led(1, i + 8, ui.seq_focus == i and 12 or 3)
   end
-  g:led(16,11,sequence[v][p].focus == "main" and 1 or 10)
+  -- fill button:
+  if ui.control_set == 'play' then
+    g:led(12,12,sequence[v].focus == "main" and 2 or 10)
+  else
+    g:led(12,12,tracks_ui.show_fill and 10 or 2)
+  end
+  -- chain button:
+  g:led(16,11,tracks_ui.show_chain and 10 or 3)
   if ui.control_set == 'play' or ui.control_set == 'edit' then
 		local this_seq = sequence[v][p]
-    for s = this_seq.start_point, this_seq.end_point do
-      local x = util.wrap(s,1,8)
-      local batch = s <= 8 and 1 or (s<= 16 and 2 or 3)
-      local brightness
-      local focused = this_seq.focus == "main" and sequence[v][p] or sequence[v][p].fill
-      if this_seq.step == s and sequence[v].playing and tracks_ui.seq_page[v] == sequence[v].page then
-        brightness = focused.trigs[s] and 15 or 10
-      else
-        brightness = focused.trigs[s] and 5 or 2
+    if tracks_ui.show_chain then
+      -- show pattern chain:
+      for s = 1,24 do
+				local x = util.wrap(s, 1, 8)
+				local batch = s <= 8 and 1 or (s <= 16 and 2 or 3)
+				local brightness
+        if tracks_ui.show_chain_edit_position[v] == s then
+          brightness = 15
+        elseif sequence[v].page_chain.ix == s then
+          brightness = 8
+        else
+          brightness = sequence[v].page_chain[s] ~= nil and 4 or 2
+        end
+        g:led(x+3, batch+8, brightness)
       end
-      g:led(x+3, batch+8, brightness)
+    else
+      -- show steps:
+      for s = this_seq.start_point, this_seq.end_point do
+        local x = util.wrap(s,1,8)
+        local batch = s <= 8 and 1 or (s<= 16 and 2 or 3)
+        local brightness
+        local focused = sequence[v].focus == "main" and sequence[v][p] or sequence[v][p].fill
+        if ui.control_set == 'play' then
+          focused = sequence[v].focus == "main" and sequence[v][p] or sequence[v][p].fill
+        else
+          focused = tracks_ui.show_fill and sequence[v][p].fill or sequence[v][p]
+        end
+        if this_seq.step == s and sequence[v].playing and tracks_ui.seq_page[v] == sequence[v].page then
+          brightness = focused.trigs[s] and 15 or 10
+        else
+          brightness = focused.trigs[s] and 5 or 2
+        end
+        g:led(x+3, batch+8, brightness)
+      end
     end
   elseif ui.control_set == 'step_parameters' then
 		for s = step.seq[v].locks.start_point, step.seq[v].locks.end_point do
@@ -495,22 +562,40 @@ function trx_ui.draw_grid(v)
       g:led(s+1,v,brightness)
     end
   end
+  -- patterns:
 	for x = 13,16 do
     for y = 9,10 do
       g:led(x,y,2)
       local sel = (x - 12) + ((y-9)*4)
-      if ui.control_set == 'edit' then
-        if sequence[v].page == sel and sequence[v].page ~= p then
-          g:led(x,y,5)
-        elseif sequence[v].page == sel and sequence[v].page == p then
-					g:led(x, y, 10)
-        elseif p == sel then
-					g:led(x, y, 10)
+      if tracks_ui.show_chain then
+        local brightness = 2
+        -- if the chain step is empty, lowest brightness:
+        if sequence[v].page_chain[tracks_ui.show_chain_edit_position[v]] == nil then
+          brightness = 2
+        else
+          -- if the chain step has data:
+          if sequence[v].page_chain[tracks_ui.show_chain_edit_position[v]] ~= nil then
+            brightness = sel == sequence[v].page_chain[tracks_ui.show_chain_edit_position[v]] and 15 or 2
+          end
+          if sequence[v].page_chain:peek() == sel and sequence[v].page_chain[tracks_ui.show_chain_edit_position[v]] ~= sel then
+            brightness = 5
+          end
         end
+				g:led(x, y, brightness)
       else
-				if sequence[v].page == sel then
-					g:led(x, y, 10)
-				end
+        if ui.control_set == 'edit' then
+          if sequence[v].page == sel and sequence[v].page ~= p then
+            g:led(x,y,5)
+          elseif sequence[v].page == sel and sequence[v].page == p then
+            g:led(x, y, 10)
+          elseif p == sel then
+            g:led(x, y, 10)
+          end
+        else
+          if sequence[v].page == sel then
+            g:led(x, y, 10)
+          end
+        end
       end
     end
   end

@@ -536,7 +536,7 @@ CheatCranes {
 
 		paramProtos[voiceKey][\velocity] = velocity;
 		indexTracker[voiceKey] = allocVoice;
-		('should trigger').postln;
+		// ('should trigger').postln;
 		if (voiceTracker[voiceKey][allocVoice].isPlaying, {
 			this.triggerSample(voiceKey, velocity, allocVoice);
 		});
@@ -779,6 +779,7 @@ CheatCranes {
 
 	clearSamples { arg voice;
 		8.do({ arg allocVoice;
+			("stopping loopers "++allocVoice).postln;
 			polyParams[voice][allocVoice.asInteger][\looper].stop;
 		});
 		("clearSamples: " ++ voice).postln;
@@ -869,10 +870,10 @@ CheatCranes {
 		synthKeys[voice] = model;
 		paramProtos[voice] = Dictionary.newFrom(generalizedParams[model]);
 		8.do({ arg i;
-			('setting poly params ' ++ voice ++ ' ' ++i).postln;
+			// ('setting poly params ' ++ voice ++ ' ' ++i).postln;
 			polyParams[voice][i] = Dictionary.newFrom(generalizedParams[model]);
 		});
-		('building synth ' ++ voice ++ ' ' ++ model).postln;
+		('buuuuilding synth ' ++ voice ++ ' ' ++ model).postln;
 		(voiceLimit[voice]).do({ arg voiceIndex;
 			voiceTracker[voice][voiceIndex] = Synth.new(synthKeys[voice], paramProtos[voice].getPairs);
 			NodeWatcher.register(voiceTracker[voice][voiceIndex],true);
@@ -937,7 +938,7 @@ CheatCranes {
 					paramProtos[voice] = Dictionary.newFrom(generalizedParams[model]);
 					('setModel??' ++ model).postln;
 					8.do({ arg i;
-						('setting poly params ' ++ voice ++ ' ' ++i).postln;
+						// ('setting poly params ' ++ voice ++ ' ' ++i).postln;
 						polyParams[voice][i] = Dictionary.newFrom(generalizedParams[model]);
 					});
 				},

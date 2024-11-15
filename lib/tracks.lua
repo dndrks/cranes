@@ -185,6 +185,7 @@ function track_actions.init(target, page, clear_reset)
 		sequence[target].manual_note_entry = false
 		sequence[target].mute_during_note_entry = false
 		sequence[target].page = 1
+		sequence[target].focus = "main"
 		sequence[target].page_active = {
 			true,
 			false,
@@ -205,7 +206,8 @@ function track_actions.init(target, page, clear_reset)
 			100,
 			100,
 		}
-		sequence[target].page_chain = _sequins({ 1 })
+		sequence[target].page_chain_ids = {1}
+		sequence[target].page_chain = _sequins(sequence[target].page_chain_ids)
 	end
 
 	sequence[target][page] = {}
@@ -220,7 +222,7 @@ function track_actions.init(target, page, clear_reset)
 	sequence[target][page].swing = 50
 	sequence[target][page].mode = "fwd"
 	sequence[target][page].loop = true
-	sequence[target][page].focus = "main"
+	-- sequence[target][page].focus = "main"
   sequence[target][page].pad_id = {}
   sequence[target][page].seed_default_note = {}
   sequence[target][page].chord_degrees = {}
@@ -327,7 +329,7 @@ end
 function track_actions.trigger_step(i,step)
 	local _active = sequence[i]
 	local _a = _active[_page]
-	local focused_set = _a.focus == "main" and _a or _a.fill
+	local focused_set = _active.focus == "main" and _a or _a.fill
 	local focused_pad = focused_set.pad_id
   if focused_set.trigs[index] and not focused_set.muted_trigs[index] then
     if retrig_index == nil then
@@ -569,7 +571,7 @@ end
 function track_actions.generate_er(i, j, _page)
 	local _active = sequence[i]
 	local _a = _active[_page]
-	local focused_set = _a.focus == "main" and _a or _a.fill
+	local focused_set = _active.focus == "main" and _a or _a.fill
 	local generated = euclid.gen(focused_set.er.pulses, focused_set.er.steps, focused_set.er.shift)
 	for length = focused_set.start_point, focused_set.end_point do
 		_tracks.change_trig_state(focused_set, length, generated[length - (focused_set.start_point - 1)], i, j, _page)
@@ -606,7 +608,7 @@ end
 function track_actions.check_prob(target, step)
 	local _active = sequence[target]
 	local _a = _active[_active.page]
-	local _f = _a.focus == "main" and _a.prob[step] or _a.fill.prob[step]
+	local _f = _active.focus == "main" and _a.prob[step] or _a.fill.prob[step]
 	if _f == 0 then
 		return false
 	elseif _f >= math.random(1, 100) then
@@ -622,18 +624,18 @@ function track_actions.run(target, step)
   -- if target == 1 then print(_active.page, step) end
 	if
 		(
-			_a.focus == "main"
+			_active.focus == "main"
 			and (_a.trigs[step] == true or _a.lock_trigs[step] == true or _a.legato_trigs[step] == true)
 		)
 		or (
-			_a.focus == "fill"
+			_active.focus == "fill"
 			and (_a.fill.trigs[step] == true or _a.fill.lock_trigs[step] == true or _a.fill.legato_trigs[step] == true)
 		)
 	then
 		local should_happen = track_actions.check_prob(target, step)
 		if should_happen then
-			local A_step = _a.focus == "main" and _a.conditional.A[step] or _a.fill.conditional.A[step]
-			local B_step = _a.focus == "main" and _a.conditional.B[step] or _a.fill.conditional.B[step]
+			local A_step = _active.focus == "main" and _a.conditional.A[step] or _a.fill.conditional.A[step]
+			local B_step = _active.focus == "main" and _a.conditional.B[step] or _a.fill.conditional.B[step]
 
 			if _a.conditional.mode[step] == "A:B" then
 				if _a.conditional.cycle < A_step then
@@ -694,7 +696,7 @@ function track_actions.execute_step(target, step)
 	local focused_trigs = {}
 	local focused_pad = {}
 	local focused_legato = {}
-	if _a.focus == "main" then
+	if _active.focus == "main" then
 		focused_trigs = _a.trigs[step]
 		focused_pad = _a.pad_id[step]
 		focused_legato = _a.legato_trigs[step]
@@ -731,7 +733,7 @@ function track_actions.retrig_step(target, step)
 		_a.conditional.retrig_clock = nil
 	end
 	local focused_set, focused_notes = {}, {}
-	if _a.focus == "main" then
+	if _active.focus == "main" then
 		focused_set = _a.conditional
 		focused_pad = _a.pad_id
 	else
@@ -769,7 +771,7 @@ end
 function track_actions.reset_note_to_default(i, j)
 	local _active = sequence[i]
 	local _a = _active[_active.page]
-	local focused_set = _a.focus == "main" and _a or _a.fill
+	local focused_set = _active.focus == "main" and _a or _a.fill
 	local note_check
 	note_check = hills_pad_id[i]
 	if focused_set.pad_id[_active.ui_position] == note_check then
