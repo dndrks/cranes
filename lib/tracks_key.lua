@@ -5,6 +5,15 @@ function key_actions.parse(n, z)
 		_fkprm.key(n, z)
 	elseif ui.control_set == "poly parameters" then
 		_polyparams.key(n, z)
+	elseif tracks_ui.show_chain then
+		local i = ui.seq_focus
+		if z == 1 then
+			if n == 2 then
+				_tUi.duplicate_link(i, tracks_ui.show_chain_edit_position[i])
+			elseif n == 3 then
+				_tUi.delete_link(i, tracks_ui.show_chain_edit_position[i])
+			end
+		end
 	else
 		if z == 1 then
 			-- local s_c = ui.screen_controls[ui.seq_focus][hills[ui.seq_focus].screen_focus]

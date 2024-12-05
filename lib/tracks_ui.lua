@@ -83,7 +83,7 @@ function trx_ui.draw_menu()
   screen.text(ui.seq_focus)
   screen.fill()
   screen.aa(0)
-  if ui.control_set ~= "seq" then
+  if not tracks_ui.show_chain then
     if ui.control_set ~= 'step parameters' and ui.control_set ~= 'poly parameters' and ui.control_set ~= 'cc parameters' then
       local focus = hf
       screen.level(1)
@@ -434,6 +434,39 @@ function trx_ui.draw_menu()
     elseif ui.control_set == 'cc parameters' then
       _ccparams.redraw()
     end
+  else
+		trx_ui.draw_meta_sequence_menu()
+  end
+end
+
+function trx_ui.draw_meta_sequence_menu()
+	local hf = ui.seq_focus
+	local _page = tracks_ui.seq_page[hf]
+	local _target = sequence[hf]
+	local _a = sequence[hf][_page]
+  local chain_page = tracks_ui.show_chain_edit_position[hf]
+	screen.move(128, 10)
+  -- screen.aa(1)
+	screen.font_size(10)
+	-- screen.text(_target.page_chain.ix)
+  screen.level(15)
+  screen.text_right("LINK: "..chain_page)
+  screen.font_size(8)
+  screen.move(0, 25)
+  if _target.page_chain[chain_page] ~= nil then
+    screen.text('assigned pattern: '.._target.page_chain[chain_page])
+		screen.move(0, 35)
+		screen.text("probability: " .. _target.page_probability[chain_page])
+  else
+    screen.text('assigned pattern: none')
+  end
+  if chain_page ~= 1 and _target.page_chain[chain_page] ~= nil then
+    screen.move(128, 64)
+    screen.text_right("K3: DELETE")
+  end
+  if _target.page_chain[chain_page] ~= nil then
+    screen.move(0, 64)
+    screen.text("K2: DUPLICATE")
   end
 end
 
@@ -728,6 +761,28 @@ function trx_ui.index_to_grid_pos(val,columns)
   local x = ((val-1)%columns)+1
   local y = val <= 8 and 1 or (val<=16 and 2 or 3)
   return {x,y}
+end
+
+function trx_ui.delete_link(i,position)
+  if position ~= 1 then
+    table.remove(sequence[i].page_chain_ids, position)
+    sequence[i].page_chain:settable(sequence[i].page_chain_ids)
+    if position < tracks_ui.show_chain_edit_position[i] then
+      local distance = tracks_ui.show_chain_edit_position[i] - position
+      tracks_ui.show_chain_edit_position[i] = tracks_ui.show_chain_edit_position[i] - distance
+    end
+  end
+end
+
+function trx_ui.duplicate_link(i, position)
+	if position ~= 24 then
+		table.insert(sequence[i].page_chain_ids, position+1, sequence[i].page_chain_ids[position])
+		sequence[i].page_chain:settable(sequence[i].page_chain_ids)
+		-- if position < tracks_ui.show_chain_edit_position[i] then
+		-- 	local distance = tracks_ui.show_chain_edit_position[i] - position
+		-- 	tracks_ui.show_chain_edit_position[i] = tracks_ui.show_chain_edit_position[i] - distance
+		-- end
+	end
 end
 
 return trx_ui
